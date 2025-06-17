@@ -1,0 +1,344 @@
+---
+title: "250499 report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+```{r}
+library(DescTools)
+library(sf)
+library(tmap)
+library(tmaptools)
+library(RColorBrewer)
+library(htmlwidgets)
+library(leaflet)
+library(leafem)
+# source(here::here("05_config", "packages.R"))
+```
+
+
+```{r}
+source(here("03_analysis", "analysis_funs.r"))
+```
+
+
+```{r}
+# Load raw data
+df_jp_raw <- read.csv(here("01_data", "intermediate", "population", "overseas_master.csv"), fileEncoding = "cp932") |>
+  dplyr::filter(between(year, 2013, 2019))
+df_de_raw <- read.csv(here("01_data", "intermediate", "german", "foreign_master.csv")) |>
+  dplyr::filter(between(year, 2013, 2019))
+
+df_jp_native_raw <- read.csv(here("01_data", "intermediate", "population", "japanese_master.csv"), fileEncoding = "cp932") |>
+  dplyr::filter(between(year, 2013, 2019))
+df_de_native <- read.csv(here("01_data", "intermediate", "german", "native_master.csv")) |>
+  select(-total_foreign) |>
+  rename(total = population) |>
+  dplyr::filter(between(year, 2013, 2019))
+```
+
+```{r}
+# Area data
+df_de_area <- readxl::read_xlsx(here("01_data", "raw", "german", "area",  "area.xlsx")) |>
+  select(
+    county_id = 1,
+    area = 3
+  ) |>
+  mutate(across(c(area, county_id), as.numeric)) |>
+  dplyr::filter(!is.na(area))
+
+df_jp_area <- read.csv(here("01_data", "raw", "area",  "R1_R5_mencho.csv"), fileEncoding = "cp932") |> 
+  select(
+    county_id = 1,
+    area = 33
+  ) |> 
+  mutate(across(c(area, county_id), as.numeric)) |> 
+  dplyr::filter(!is.na(area))
+```
+
+```{r}
+df_jp <- select_cols_jp(df_jp_raw)
+df_de <- select_cols_de(df_de_raw)
+df_jp_native <- select_cols_jp(df_jp_native_raw)
+```
+
+
+```{r}
+df_analysis <- df_de |>
+  create_scatter_df(total) |>  
+  dplyr::filter(year == 2019)
+
+df_analysis_a <- df_de |>
+  create_scatter_df(total) |> 
+  dplyr::filter(year == 2019)
+
+mean_de <- mean(df_analysis$ln_change_rate_total, na.rm = TRUE)
+sd_de <- sd(df_analysis$ln_change_rate_total, na.rm = TRUE)
+```
+
+## Urban
+
+```{r}
+df_cor <- readxl::read_xlsx(here::here('01_data', 'intermediate', 'german', "nuts_correspondence.xlsx")) |>
+    select(county_id, nuts_code3)
+
+df_geo_de_raw <- read_sf(
+  here::here('01_data', 'raw', 'mapping', 'NUTS250_N3.shp'))
+
+df_geo_de <- df_geo_de_raw |>
+  dplyr::filter(GF == 4) |> 
+  select(NUTS_CODE, geometry) |>
+  distinct() |>
+  mutate(
+    NUTS_CODE = if_else(NUTS_CODE == "DE734", "DE731", NUTS_CODE)
+  ) |>
+  summarise(geometry = st_union(geometry), .by = NUTS_CODE)
+```
+
+```{r}
+df_de_total <- read.csv(here("01_data", "intermediate", "german", "total_master.csv"))
+
+df_de_class <- df_de_total |> 
+  rename(total = population) |>
+  left_join(df_de_area, by = "county_id") |> 
+  mutate(density = total / area) |> 
+  dplyr::filter(year == 2019) |>
+  mutate(
+    class = case_when(
+      total >= 500000 ~ "big",
+      (density >= 150) & (total >=100000)  ~ "urban",
+      # density >= 100 ~ "mid",
+      # density < 100 ~ "rural",
+      TRUE ~ "rural"
+    )
+  ) 
+```
+
+```{r}
+df_de_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+```
+
+```{r}
+df_de_class |> 
+  left_join(df_cor, by = "county_id") |> 
+  left_join(df_geo_de, by = c("nuts_code3" = "NUTS_CODE")) |> 
+  distinct() |> 
+  st_as_sf() |>
+  st_make_valid() |>
+  ggplot() +
+  geom_sf(aes(fill = class)) +
+  theme_void() +
+    theme(
+      legend.position = "bottom",
+      title = element_text(size = 20),
+    ) 
+```
+
+
+```{r}
+de_prop <- df_de_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+
+prop_big <- de_prop |>
+  dplyr::filter(class == "big") |>
+  pull(prop)
+
+prop_urban <- de_prop |>
+  dplyr::filter(class == "urban") |>
+  pull(prop)
+
+prop_rural <- de_prop |>
+  dplyr::filter(class == "rural") |>
+  pull(prop)
+```
+
+## Japan
+
+総務省を参考にする
+https://www.soumu.go.jp/main_sosiki/jichi_gyousei/bunken/chihou-koukyoudantai_kubun.html
+
+- 政令指定都市: Big
+- 人口5万人以上: Urban
+- それ以外: Rural
+
+
+```{r}
+df_jp_total <- read.csv(here("01_data", "intermediate", "population", "both_master.csv"), fileEncoding = "cp932") |> 
+  select_cols_jp() |>
+  dplyr::filter(year == 2019)
+
+# jp_quantile <- quantile(df_jp_total$total, probs = c(1 - prop_big, 1 - (prop_urban + prop_big), 1 - prop_rural), na.rm = TRUE)
+
+list_jp_big <- list(
+  # Tokyo 23 distincts
+  "千代田区","中央区","港区","新宿区","文京区","台東区","墨田区",
+  "江東区","品川区","目黒区","大田区","世田谷区","渋谷区","中野区",
+  "杉並区","豊島区","北区","荒川区","板橋区","練馬区","足立区","葛飾区","江戸川区",
+  "大阪市",
+  "名古屋市",
+  "京都市",
+  "横浜市",
+  "神戸市",
+  "北九州市",
+  "札幌市",
+  "川崎市",
+  "福岡市",
+  "広島市",
+  "仙台市",
+  "千葉市",
+  "さいたま市",
+  "静岡市",
+  "堺市",
+  "新潟市",
+  "浜松市",
+  "岡山市",
+  "相模原市",
+  "熊本市"
+  )
+
+df_jp_class <- df_jp_total |>
+  dplyr::filter(year == 2019) |>
+  mutate(
+    class = case_when
+    (
+      county_name %in% list_jp_big ~ "big",
+      total >= 50000 ~ "urban",
+      TRUE ~ "rural"
+    ))
+
+df_jp_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+```
+
+
+```{r}
+# df_jp_geo_raw <- sf::read_sf(here("01_data", "raw", "geodata", "municipalities", "N03-19_190101 (4).json")) |>  
+df_jp_geo_raw <- sf::read_sf(here("01_data", "raw", "geodata", "municipalities", "municipalities.geojson")) |>  
+  select(
+    urban_name = 3,
+    county_name = 4,
+    county_id = 5,
+    geometry
+  ) |>
+  mutate(county_id = as.numeric(county_id))
+```
+
+```{r}
+adjust_geometry_jp <- function(df_jp_geo_raw, df_jp_total) {
+
+  df_id_name <- df_jp_total |>
+    select(county_id_new = county_id, county_name) |> 
+    dplyr::filter(county_name %in% list_jp_big)
+
+  df_output <- df_jp_geo_raw |>
+    left_join(df_id_name, by = c("urban_name" = "county_name")) |> 
+    mutate(
+      county_id = if_else(urban_name %in% list_jp_big, county_id_new, county_id),
+    ) |> 
+    select(
+      -county_id_new, -urban_name, -county_name
+    )
+}
+
+```
+
+```{r}
+df_jp_geo <- adjust_geometry_jp(df_jp_geo_raw, df_jp_total) |>
+  mutate(
+    geometry = st_cast(geometry)
+  )
+```
+
+
+```{r}
+#| eval: false
+
+# a <- df_jp_class |> 
+#   left_join(df_jp_geo, by = "county_id") 
+
+# bb <- a |> 
+#   st_as_sf() |>
+#   tm_shape() +
+#   tm_borders() +
+#   tm_polygons("class") +
+#   tm_layout(frame = FALSE)
+
+# tmap_save(bb, here("04_output", "figures","map", "jp_class.html"))
+
+# okinawa <- df_jp_class |>
+#   left_join(df_jp_geo, by = "county_id") |> 
+#   dplyr::filter(prefecture_name == "沖縄県") |>
+#   mutate(
+#     geometry = geometry+c(4.8, 14.5)
+#   ) |>
+#   st_as_sf()
+
+# df_jp_geo |> class()
+# okinawa |> class()
+# st_crs(df_jp_geo)
+# st_crs(okinawa)
+
+# jp_plot <- df_jp_class |> 
+#   left_join(df_jp_geo, by = "county_id") |> 
+#   dplyr::filter(prefecture_name != "沖縄県") |>
+#   bind_rows(okinawa) |> 
+#   st_as_sf() |>
+#   ggplot() +
+#   geom_sf(aes(fill = class)) +
+#   theme_void() +
+#     theme(
+#       legend.position = "bottom",
+#       title = element_text(size = 20),
+#     ) 
+
+# ggsave(here("04_output", "figures", "map", "jp_gg_okinawa.pdf"), jp_plot, width = 10, height = 10)
+```
+
+```{r}
+df_jp_geo_analysis <- df_jp_class |> 
+  left_join(df_jp_geo, by = "county_id") 
+
+df_jp_geo_analysis |>
+  # dplyr::filter(prefecture_name != "沖縄県") |>
+  # dplyr::bind_rows(df_okinawa) |>
+  st_as_sf() |>
+  # dplyr::filter(
+  #   !is.na(geometry),         # remove NA geometries
+  #   !st_is_empty(geometry),   # remove empty geometries
+  #   st_is_valid(geometry)     # (optional) remove invalid geometries
+  # )
+  # st_is_valid(st_make_valid(geometry)) |> View()
+ggplot() +
+geom_sf(aes(fill = class)) +
+theme_void() +
+  theme(
+    legend.position = "bottom",
+    title = element_text(size = 20),
+  ) +
+  annotate("segment", x=131, xend=133.5, 
+          #  y=39.8, yend=39.8,
+           y=38.8, yend=39.8,
+           color="gray", linewidth=1)+
+  annotate("segment", x=133.5, xend=134.8,
+           y=39.8, yend=41.5,
+           color="gray", linewidth=1)
+
+# ggsave(here("04_output", "figures", "map", "jp_gg_okinawa.pdf"), plot_jp_output, width = 10, height = 10)
+
+```
+

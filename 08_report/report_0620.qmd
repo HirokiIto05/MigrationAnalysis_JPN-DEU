@@ -1,0 +1,379 @@
+---
+title: "report_0621"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+    fig-width: 10
+    fig-height: 10
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+#  
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+    here,
+    dplyr,
+    ggplot2,
+    janitor,
+    tidyr,
+    gt,
+    gtExtras,
+    estimatr,
+    modelsummary
+)
+
+
+renv::snapshot()
+
+```
+
+```{r}
+
+df_foreign <- read.csv(here::here("01_data", "intermediate", "population", "overseas_master.csv"), fileEncoding = "cp932") |>  
+    dplyr::filter(year <= 2020)
+
+df_japan <- read.csv(here::here("01_data", "intermediate", "population", "japanese_master.csv"), fileEncoding = "cp932") |>
+    dplyr::filter(year <= 2020)
+
+
+
+df_total <- df_japan |>
+    dplyr::bind_rows(df_foreign) |>
+    select(city_id, year, total) |>
+    summarise(
+        population_all = sum(total, na.rm = TRUE),
+        .by = c(city_id, year)
+    )
+
+
+df_foreign <- df_foreign |>
+    left_join(df_total, by = c("city_id", "year")) |>
+    dplyr::mutate(
+        dom_rate = moving_in_dom / population_all,
+        int_rate = moving_in_int / population_all
+    )
+```
+
+
+```{r}
+
+table_dom <-  df_foreign |>
+    dplyr::summarise(
+        mean_dom = round(mean(dom_rate, na.rm = TRUE), digits = 3),
+        .by = c(city_id, city_name, prefecture_name)
+    ) |>
+    arrange(desc(mean_dom)) |>
+    slice_head(n = 50) |>
+    select(-city_id) |>
+    rename(
+        prefecture_dom = prefecture_name,
+        city_dom = city_name
+    )
+
+
+
+table_int <- df_foreign |>
+    dplyr::summarise(
+        mean_int = round(mean(int_rate, na.rm = TRUE), digits = 3),
+        .by = c(city_id, city_name, prefecture_name)
+    ) |>
+    arrange(desc(mean_int)) |>
+    slice_head(n = 50) |>
+    select(-city_id) |>
+    rename(
+        prefecture_int = prefecture_name,
+        city_int = city_name
+    )
+```
+
+## 外国人流入割合
+### 東京、大阪、神奈川、愛知
+ - 流入数 / 合計人口(外国人 + 日本人) で算出
+```{r}
+
+table_dom |>
+    bind_cols(table_int) |>
+    gt() |>
+    tab_style(
+        style = list(
+            cell_fill(color = "lightgrey")
+            ),
+        locations = cells_body(
+      columns = prefecture_dom, # not needed if coloring all columns
+      rows = prefecture_dom %in% c("東京都", "大阪府", "神奈川県", "愛知県")
+  )) |>
+    tab_style(
+        style = list(
+            cell_fill(color = "lightgrey")
+            ),
+        locations = cells_body(
+      columns = c(prefecture_int), # not needed if coloring all columns
+      rows = prefecture_int %in% c("東京都", "大阪府", "神奈川県", "愛知県")
+  )) |>
+    tab_spanner(
+    label = '国内流入',
+    columns = dplyr::ends_with("dom")
+  ) |>
+  tab_spanner(
+    label = '国外流入',
+    columns = dplyr::ends_with("int")
+  )
+```
+
+
+```{r}
+
+list_foreign_top_city <- df_foreign |>
+    summarise(
+        n = sum(total, na.rm = TRUE),
+        .by = c(city_id, city_name, prefecture_name)
+    ) |>
+    arrange(desc(n)) |>
+    slice_head(n = round(1741*0.1, digits = 0)) |>
+    pull(city_name)
+
+```
+
+
+### 外国人人口上位50都市
+ - 流入数 / 合計人口(外国人 + 日本人) で算出
+
+```{r}
+
+table_dom |>
+    bind_cols(table_int) |>
+    gt() |>
+    tab_style(
+        style = list(
+            cell_fill(color = "lightgrey")
+            ),
+        locations = cells_body(
+      columns = city_dom, # not needed if coloring all columns
+      rows = city_dom %in% list_foreign_top_city
+  )) |>
+    tab_style(
+        style = list(
+            cell_fill(color = "lightgrey")
+            ),
+        locations = cells_body(
+      columns = c(city_int), # not needed if coloring all columns
+      rows = city_int %in% list_foreign_top_city
+  )) |>
+    tab_spanner(
+    label = '国内流入',
+    columns = dplyr::ends_with("dom")
+  ) |>
+  tab_spanner(
+    label = '国外流入',
+    columns = dplyr::ends_with("int")
+  ) 
+
+
+```
+
+
+
+# Germany
+
+
+```{r}
+
+df_raw <- readxl::read_xlsx(here::here("01_data", "raw", "german", "12521-0040-KREISE_$F.xlsx"))
+
+```
+
+
+```{r}
+
+clean_german <- function(df) {
+
+    df_german <- df_raw |>
+        dplyr::select(
+            municipality_id = 1,
+            municipality_name = 2,
+            population = 5
+        ) |>
+    dplyr::mutate(
+        year = if_else(
+            stringr::str_detect(municipality_id, "31.12"),
+            stringr::str_sub(municipality_id, start = -4, end = -1), 
+            NA
+        )) |> 
+    tidyr::fill(year, .direction = "down") |>
+    mutate(
+        year = as.numeric(year),
+        population = as.numeric(population)
+    ) |>
+    dplyr::filter(
+        between(year, 2012, 2023)
+    )
+    # tidyr::drop_na()
+
+    return(df_german)
+}
+
+df_german <- clean_german(df_raw) |>
+    dplyr::filter(year >= 2014) |>
+    tidyr::drop_na()
+```
+
+
+```{r}
+
+df_german_analysis <- df_german |>
+    dplyr::arrange(municipality_id, year) |> 
+    dplyr::group_by(municipality_id) |>
+    dplyr::mutate(
+      ln_total = log(population),
+      lag_ln_total = dplyr::lag(ln_total),
+      ln_change_rate_total = ln_total - lag_ln_total
+    )
+```
+
+
+```{r}
+create_lm <- function(df_input) {
+  
+  model_output <- list(
+    "2014" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2014)),
+    "2015" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2015)),
+    "2016" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2016)),
+    "2017" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2017)),
+    "2018" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2018)),
+    "2019" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2019)),
+    "2020" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2020)),
+    "2021" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2021)), 
+    "2022" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2022)), 
+    "2023" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2023))
+    )
+  
+  return(model_output)
+  
+}
+
+
+
+create_model_summary <- function (model_input, title_n) {
+  
+  gm <- tibble(
+    raw = c("nobs", "r.squared", "adj.r.squared"),
+    clean = c("N", "R2", "R2 adj"),
+    fmt = c(0, 3, 3)
+  )
+  
+  model_based <- modelsummary::msummary(model_input, fmt = "%.4f", 
+                                        estimate =  "{estimate}{stars}",
+                                        stars = c('*' = .1, '**' = .05, '***' = .01),
+                                        coef_rename = c("ln_lag_total" = "β1"),
+                                        gof_map = gm,
+                                        gof_omit = 'AIC|BIC|RMSE',
+                                        output = "data.frame")
+  
+  results_model <- model_based |>
+    dplyr::filter(
+        term != "(Intercept)"
+    )
+  
+  return(results_model)
+  
+}
+
+
+
+```
+
+
+
+```{r}
+
+model_german <- create_lm(df_german_analysis)
+create_model_summary(model_german) |> gt()
+
+```
+
+
+
+
+```{r}
+
+create_scatter <-  function(input_df,
+                            title_x){
+  
+  plot_based_df <- input_df |> 
+    dplyr::filter(!year %in% c(2013, 2014))
+  
+  output_plot <- ggplot(plot_based_df,
+                       aes(x = lag_ln_total, y = ln_change_rate_total)) +
+    geom_point(alpha = 0.5, colour = "#333333",
+               fill = "#333333") +
+    theme_bw(base_family = "HiraKakuPro-W3") +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 22),
+      strip.text.x = element_text(size = 20)
+      ) +
+    labs(
+      x = title_x,
+      y = "対数変化率（ln）") +
+    geom_hline(yintercept = 0,
+               linewidth = 0.6,
+               colour = "black",
+               linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ year,
+               scales = "free") +
+    scale_x_continuous(
+      breaks = scales::pretty_breaks(n = 3)) 
+    # scale_y_continuous(
+    #   breaks = c(-2, -1, 0, 1, 2),
+    #   limits = c(-2, 2)
+    # )
+  
+  return(output_plot)
+}
+
+```
+
+
+```{r}
+create_scatter(df_german_analysis, title_x = "対数人口（ln）")
+```
+
+

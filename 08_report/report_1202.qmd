@@ -1,0 +1,392 @@
+---
+title: "1202 report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+    fig-width: 12
+    fig-height: 8
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+
+```{r}
+source(here::here("05_config", "packages.R"))
+source(here::here("02_clean", "german", "residence_permit", "funs_residence_permit.r"))
+```
+
+
+```{r}
+#| label: read data
+df_germany_rawname <- readxl::read_xlsx(here("01_data", "intermediate", "german", "foreign_status_rawname.xlsx"))
+
+df_germany_rawname |> 
+  summarise(
+    n = sum(total, na.rm = TRUE),
+    .by = c(permission_title,permission_title_jpn, year)
+  ) |> 
+  openxlsx::write.xlsx(
+    here::here("01_data", "intermediate", "german", "foreign_status_rawname_summary.xlsx")
+  )
+
+
+df_japan_rawname <- read.csv(
+  here::here(
+    "01_data", "intermediate", "foreign_status", "foreign_status_rawname.csv"
+    ),
+  fileEncoding = "cp932")
+
+df_japan_rawname |> View()
+```
+
+```{r}
+#| label: clean data Japan
+df_japan_pct <- df_japan_rawname |>
+  summarise(
+    n = sum(value, na.rm = TRUE),
+    .by = c(permission_title, permission_title_jpn)
+  ) |>
+  mutate(
+    japan = round(n / sum(n), digits = 3)
+  ) |>
+  select(permission_title_eng = permission_title, permission_title_jpn, japan)
+
+df_permit_eng_jpn <- df_japan_pct |>
+  distinct(permission_title_eng, permission_title_jpn)
+```
+
+```{r}
+#| label: clean data Germany
+df_germany_pct <- df_germany_rawname |> 
+  summarise(
+    n = sum(total, na.rm = TRUE),
+    .by = permission_title_jpn,
+  ) |>
+  mutate(
+    germany = round(n / sum(n), digits = 3)
+  ) |>
+  select(permission_title_jpn, germany)
+df_germany_pct |> View()
+```
+
+```{r}
+df_merge_pct <- df_germany_pct |>
+  left_join(df_japan_pct |> select(-permission_title_eng))
+```
+
+# Percentage of residence permit in Germany and Japan
+
+```{r}
+df_merge_pct |> 
+  pivot_longer(
+    cols = -permission_title_jpn, 
+    names_to = "country", 
+    values_to = "percent") |> 
+ggplot(aes(x = permission_title_jpn, y = percent, fill = country)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  theme_minimal(base_family = "HiraKakuPro-W3") +
+  theme(axis.text = element_text(size = 16)) +
+  labs(title = "Percentage of residence permit in Germany and Japan",
+       x = "Permission title (Japanese)",
+       y = "Percentage")
+```
+
+
+## Summary permission title
+
+```{r}
+#| label: Summary permission title
+df_germany_summary <- df_germany_rawname |>
+  mutate(
+    permission_title_jpn = if_else(
+      permission_title %in% c(
+      "S.18(3),RA,res.perm. for empl.not requir.voc.qual.",
+      "Temp. residence title according to Foreigners Act",
+      "Residence title for spec. purp. acc. to For. Act",
+      "S.17b(1)RA,res.perm.,training interns, EU studies"),
+      "技能実習１号",
+      permission_title_jpn
+    )
+  ) |>
+  mutate(
+    permission_title_eng = replace_na(permission_title_eng, "not_exist")
+  ) |>
+  select(year, permission_title, permission_title_eng, county_code, city_name, total) |>
+  pivot_wider(
+    id_cols = c(year, county_code, city_name, permission_title),
+    names_from = permission_title_eng,
+    values_from = total
+  ) |>
+  streamline_status_germany() |>
+  rowwise() |>
+  mutate(
+    total = sum(c(high_skill, low_skill, training, status, other, not_exist), na.rm = TRUE)
+  ) |> 
+  ungroup()
+
+df_germany_total_sum <- df_germany_summary |>
+  summarise(
+    across(c(high_skill, low_skill, training, status, other, not_exist), sum, na.rm = TRUE)
+    # high_skill, low_skill, training, status, other, not_exist, total
+  ) |>
+  mutate(country = "germany") |>
+  pivot_longer(
+    cols = -country, 
+    names_to = "status", 
+    values_to = "value")  |>
+  mutate(
+    percent = round(value / sum(value), digits = 3)
+  )
+df_germany_total_sum |> View()
+  
+
+df_japan_summary <- read.csv(
+  here::here("01_data", "intermediate", "foreign_status", "foreign_status.csv"), 
+  fileEncoding = "cp932") |> 
+  dplyr::filter(
+    between(year, 2013, 2019))
+
+
+value_japan_total <- sum(df_japan_summary$total_foreign, na.rm = TRUE)
+
+df_japan_total_sum <- df_japan_summary |> 
+  summarise(
+    across(c(high_skill, low_skill, training, status, other, total_foreign), sum, na.rm = TRUE)
+    # high_skill, low_skill, training, status, other, not_exist, total
+  ) |> 
+  rename(total = total_foreign) |> 
+  mutate(country = "japan") |>  
+  pivot_longer(
+    cols = -country, 
+    names_to = "status", 
+    values_to = "value") |>
+  dplyr::filter(status != "total") |>
+  mutate(
+    percent = round(value / value_japan_total, digits = 3)
+  )
+```
+
+```{r}
+df_merge_summary_total <- df_germany_total_sum |>
+  bind_rows(df_japan_total_sum)
+
+df_merge_summary_total |>
+  ggplot(aes(x = status, y = percent, fill = country)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  theme_minimal() +
+  theme(
+    axis.text = element_text(size = 16)) +
+  # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Summary permission title",
+       x = "Permission title (English)",
+       y = "Total")
+```
+
+
+## Check the scope of the residence permit data in Germany
+
+- scope: EUROPA, AFRIKA, AMERIKA, ASIEN, AUSTRALIEN
+
+```{r results='asis'}
+df_rp <- df_germany_summary |>
+  summarise(res_pmt = sum(total, na.rm = TRUE), .by = year) 
+
+df_germany_all <- read.csv(here("01_data", "intermediate", "german", "foreign_master.csv")) |>
+  summarise(all = sum(total, na.rm = TRUE), .by = year)
+
+left_join(df_rp, df_germany_all) |>
+  gt() |>
+  tab_header(title = "Check the scope of the residence permit data in Germany")
+
+```
+
+
+## Transition of residence permit in Germany 
+
+```{r}
+df_germany_summary |> 
+  summarise(
+    across(c(high_skill, low_skill, training, status, other, not_exist), sum, na.rm = TRUE),
+    .by = year
+  ) |> 
+  pivot_longer(
+    cols = -year, 
+    names_to = "status", 
+    values_to = "value") |> 
+  ggplot(aes(x = year, y = value, color = status)) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  labs(
+    title = "Transition of residence permit in Germany",
+    x = "Year",
+    y = "Total") 
+```
+
+
+## All population
+
+### Check distribution
+"the proportionate growth process (the
+second regularity) gives rise to the lognormal distribution"(Eeckhout, 2004)
+
+```{r}
+df_jap <- read.csv(here::here("01_data", "intermediate", "population", "japanese.csv"), fileEncoding = "cp932")
+df_for <- read.csv(here::here("01_data", "intermediate", "population", "overseas.csv"), fileEncoding = "cp932")
+```
+
+#### Japan
+
+```{r}
+plot <- ggplot(data = df_jap |> dplyr::filter(year == 2015), mapping = aes(x = total)) + 
+  # geom_histogram() + 
+  # geom_histogram(binwidth = 0.1) +
+  geom_density(mapping = aes(y = ..density..), alpha = 0.5) +
+  scale_x_continuous(limits = c(0, 1000000)) +
+  theme_bw() +
+  labs(title = "Raw number")
+
+ln_plot <- ggplot(data = df_jap |> dplyr::filter(year == 2015), mapping = aes(x = ln_total)) + 
+  # geom_histogram() + 
+  geom_histogram(binwidth = 0.1) +
+  geom_density(mapping = aes(y = ..density..), fill = "blue", alpha = 0.5) +
+  theme_bw() +
+  labs(title = "Log number")
+
+plot + ln_plot
+```
+
+
+#### Foreign
+
+```{r}
+plot <- ggplot(data = df_for |> dplyr::filter(year == 2015), mapping = aes(x = total)) + 
+  # geom_histogram() + 
+  # geom_histogram(binwidth = 0.1) +
+  geom_density(mapping = aes(y = ..density..), alpha = 0.5) +
+  scale_x_continuous(limits = c(0, 1000000)) +
+  theme_bw() +
+  labs(title = "Raw number")
+
+ln_plot <- ggplot(data = df_for |> dplyr::filter(year == 2015), mapping = aes(x = ln_total)) + 
+  # geom_histogram() + 
+  geom_histogram(binwidth = 0.1) +
+  geom_density(mapping = aes(y = ..density..), fill = "blue", alpha = 0.5) +
+  theme_bw() +
+  labs(title = "Log number")
+
+plot + ln_plot
+```
+
+
+```{r}
+ks_test_df <- function(year_i, df, x_var) {
+  x_var <- rlang::enquo(x_var)
+
+  df <- df |>
+    dplyr::filter(
+      !is.infinite(!!x_var),
+      # !is.infinite(ln_total),
+      year == year_i)
+
+  mean_ln_total <- df |>
+    pull(!!x_var) |>
+    # pull(ln_total) |>
+    mean(na.rm = TRUE)
+
+  sd_ln_total <- df |>
+    pull(!!x_var) |>
+    # pull(ln_total) |>
+    sd(na.rm = TRUE)
+
+  set.seed(111)
+
+  simulation_data <- rnorm(nrow(df), mean = mean_ln_total, sd = sd_ln_total)
+
+  result <- ks.test(df |> pull(!!x_var), simulation_data)
+
+  ks_output <- tibble(
+    year = year_i,
+    stat = round(result$statistic, digits = 3),
+    p_value = round(result$p.value, digits = 3)
+  )
+
+  return(ks_output)
+}
+```
+
+
+```{r}
+df_ks_jap <- purrr::map(seq(2014, 2022), ks_test_df, df_jap, ln_total) |> 
+  bind_rows()
+
+df_ks_for <- purrr::map(seq(2014, 2022), ks_test_df, df_for, ln_total) |>
+  bind_rows()
+```
+
+
+```{r results='asis'}
+df_ks_jap |>
+  gt() |>
+  tab_header(title = "Japanese")
+```
+
+```{r}
+
+create_lm <- function(df_input) {
+  
+  model_output <- list(
+    "2014" = lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2015)),
+    "2015" = lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2016)),
+    "2016" = lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2017)),
+    "2017" = lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2018)),
+    "2018" = lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2019)),
+    "2019" = lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2020)),
+    "2020" = lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2021)),
+    "2021" = lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2022))
+    )
+  
+  
+  
+  return(model_output)
+  
+}
+
+```
+
+
+```{r}
+df_for <- read.csv(here::here("01_data", "intermediate", "population", "overseas.csv"), fileEncoding = "cp932") |> 
+  dplyr::ungroup() |> 
+  dplyr::filter(year != 2013) |> 
+  dplyr::filter(lag_ln_total > -Inf) |> 
+  dplyr::filter(ln_change_rate_total > -Inf) 
+
+model_for <- create_lm(df_for)
+model_for |> modelsummary(stars = TRUE)
+
+```
+
+```{r results='asis'}
+df_ks_for |>
+  gt() |>
+  tab_header(title = "Foreign")
+```

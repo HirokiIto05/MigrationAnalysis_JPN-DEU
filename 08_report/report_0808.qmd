@@ -1,0 +1,292 @@
+---
+title: "0808 report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+    fig-width: 12
+    fig-height: 8
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+
+
+```{r}
+pacman::p_load(
+    here,
+    dplyr,
+    ggplot2,
+    janitor,
+    tidyr,
+    gt,
+    gtExtras,
+    estimatr,
+    modelsummary,
+    DescTools,
+    readr
+)
+
+conflicted::conflict_prefer_all("dplyr", quiet = TRUE)
+```
+
+```{r}
+source(here("03_analysis/german/function_scatter.r"))
+source(here("03_analysis/german/function_lm_table.r"))
+```
+
+```{r}
+read_native <- function(df_grm_foreign_master) {
+  df_grm_native_master <- read.csv(here("01_data", "intermediate", "german", "native_population.csv"), fileEncoding = "cp932")
+  df_id_name <- df_grm_foreign_master |>
+    distinct(county_id, county_name)
+
+  df_grm_native_master <- df_grm_native_master |>
+    left_join(df_id_name, by = "county_id") |>
+    relocate(county_name, .after = county_id)
+}
+```
+
+```{r}
+df_grm_foreign_master <- read_csv(here("01_data", "intermediate", "german", "foreign_master.csv"))
+df_grm_native_master <- read_native(df_grm_foreign_master)
+```
+
+## Native population
+### plot
+
+```{r}
+create_scatter(df_grm_native_master, ln_population, ln_change_rate, "Native")
+```
+
+
+### table
+```{r}
+gt_native <- output_table(
+  df = df_grm_native_master, 
+  outcome_i =  "ln_change_rate", 
+  covariate_i =  "lag(ln_population)")
+```
+
+
+```{r}
+gt_native
+```
+
+
+## Foreign population
+
+### plot
+
+```{r}
+create_scatter(df_grm_foreign_master, lag_ln_total, ln_change_rate_total,  "Foreign")
+```
+### table
+
+```{r}
+gt_foreign <- output_table(
+  df = df_grm_foreign_master, 
+  outcome_i =  "ln_change_rate_total", 
+  covariate_i =  "lag(ln_total)")
+```
+```{r}
+gt_foreign
+```
+
+
+### social change
+
+```{r}
+create_scatter(df_grm_foreign_master, lag_ln_total, social_rate,  "Social change")
+```
+
+
+```{r}
+gt_foreign_social <- output_table(
+  df = df_grm_foreign_master, 
+  outcome_i =  "social_change", 
+  covariate_i =  "lag(ln_total)")
+```
+
+```{r}
+gt_foreign_social
+```
+
+## Other
+
+
+```{r}
+
+calculate_change_share <- function(df) {
+
+  df_output <- df |> 
+    arrange(county_id, year) |>
+    mutate(
+      change = population - lag(population),
+      .by = county_id
+    ) |>
+    mutate(
+      sum_change = sum(change, na.rm = TRUE),
+      .by = year
+    ) |> 
+    mutate(
+      migration_share = change / sum_change
+    ) |>
+    select(county_id, year, migration_share)
+
+  num_outcome <- df_output |>
+    pull(migration_share) |>
+    quantile(probs = c(0.01, 0.99), na.rm = TRUE)
+
+  df_output <- df_output |>
+    filter(
+      between(migration_share, num_outcome[["1%"]], num_outcome[["99%"]])
+    )
+
+  return(df_output)
+}
+```
+
+
+```{r}
+df_share_native <- calculate_change_share(df_grm_native_master) |>
+  rename(share_native = migration_share)
+
+df_share_foreign <- calculate_change_share(df_grm_foreign_master |> rename(population = total)) |>
+  rename(share_foreign = migration_share)
+# df_share_native |> summarise(
+#   n_distinct(county_id),
+#   .by = year
+# )
+```
+
+
+```{r}
+df_share_merge <- left_join(df_share_native, df_share_foreign, by = c("county_id", "year")) |>
+  mutate(
+    balance = share_foreign / share_native
+  )
+```
+
+
+$$\text{share} = \frac{\text{inflow}_{it}}{\sum_{i=1}^n\text{inflow}_{it}} $$
+
+$$ \text{Balance} =  \frac{\text{Share Foreign}}{\text{Share Native}} $$
+
+
+つまり、$Balace > 0$の時、外国人の流入割合が高い。$Balance < 0$の時、国内人口の流入割合が高い。
+
+```{r}
+
+df_45 <- tibble(
+  x = seq(-1, 1, 0.01),
+  y = seq(-1, 1, 0.01)
+)
+
+ggplot(df_share_merge, aes(x = share_foreign, y = share_native, alpha = 0.5)) +
+  geom_point() +
+  geom_line(df_45, mapping = aes(x, y)) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(size = 15),
+    axis.text.x = element_text(size = 20),
+    axis.text.y = element_text(size = 20),
+    axis.title.x = element_text(size = 22),
+    axis.title.y = element_text(size = 22)
+  ) +
+  scale_x_continuous(
+    limits = c(-0.03, 0.03)
+  ) +
+  scale_y_continuous(
+    limits = c(-0.3, 0.3)
+  )
+```
+
+
+```{r}
+quantile_balance <- quantile(df_share_merge$balance, probs = c(0.01, 0.99), na.rm = TRUE)
+
+ggplot(df_share_merge |>filter(
+      between(balance, quantile_balance[["1%"]], quantile_balance[["99%"]])
+    ), aes(x = balance)) +
+  geom_histogram(binwidth = 0.1) +
+  geom_density(aes(y = ..density..), fill = "blue", alpha = 0.5) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  scale_x_continuous(
+    # breaks = c(-5, -3, 1, 3, 5),
+    # limits = c(-20, 20)
+  ) +
+    theme_bw() +
+  theme(
+    plot.title = element_text(size = 15),
+    axis.text.x = element_text(size = 20),
+    axis.text.y = element_text(size = 20),
+    axis.title.x = element_text(size = 22),
+    axis.title.y = element_text(size = 22)
+  ) 
+
+
+```
+
+## Japan
+
+```{r}
+df_jp_native <- read_csv(here("01_data", "intermediate", "population", "japanese_master.csv"), locale = locale(encoding = "cp932"))
+df_jp_foreign <- read_csv(here("01_data", "intermediate", "population", "overseas_master.csv"), locale = locale(encoding = "cp932"))
+```
+
+
+## Native population
+### plot
+
+```{r}
+create_scatter(df_jp_native, ln_total, ln_change_rate_total, "Native")
+```
+
+
+### table
+```{r}
+gt_native_jp <- output_table(
+  df = df_jp_native, 
+  outcome_i =  "ln_total", 
+  covariate_i =  "ln_change_rate_total")
+```
+
+
+```{r}
+gt_native_jp
+```
+
+
+## Foreign population
+### plot
+
+```{r}
+create_scatter(df_jp_foreign, ln_total, ln_change_rate_total, "Foreign")
+```
+
+
+### table
+```{r}
+gt_foreign_jp <- output_table(
+  df = df_jp_foreign, 
+  outcome_i =  "ln_total", 
+  covariate_i =  "ln_change_rate_total")
+```
+
+
+```{r}
+gt_foreign_jp
+```
+
+```{r}
+
+```
+

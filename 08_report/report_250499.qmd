@@ -1,0 +1,1012 @@
+---
+title: "250499 report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+```{r}
+library(DescTools)
+library(sf)
+library(tmap)
+library(tmaptools)
+library(RColorBrewer)
+library(htmlwidgets)
+library(leaflet)
+library(leafem)
+# source(here::here("05_config", "packages.R"))
+```
+
+
+```{r}
+source(here("03_analysis", "analysis_funs.r"))
+```
+
+
+```{r}
+# Load raw data
+df_jp_raw <- read.csv(here("01_data", "intermediate", "population", "overseas_master.csv"), fileEncoding = "cp932") |>
+  dplyr::filter(between(year, 2013, 2019))
+df_de_raw <- read.csv(here("01_data", "intermediate", "german", "foreign_master.csv")) |>
+  dplyr::filter(between(year, 2013, 2019))
+
+df_jp_native_raw <- read.csv(here("01_data", "intermediate", "population", "japanese_master.csv"), fileEncoding = "cp932") |>
+  dplyr::filter(between(year, 2013, 2019))
+df_de_native <- read.csv(here("01_data", "intermediate", "german", "native_master.csv")) |>
+  select(-total_foreign) |>
+  rename(total = population) |>
+  dplyr::filter(between(year, 2013, 2019))
+```
+
+```{r}
+# Area data
+df_de_area <- readxl::read_xlsx(here("01_data", "raw", "german", "area",  "area.xlsx")) |>
+  select(
+    county_id = 1,
+    area = 3
+  ) |>
+  mutate(across(c(area, county_id), as.numeric)) |>
+  dplyr::filter(!is.na(area))
+
+df_jp_area <- read.csv(here("01_data", "raw", "area",  "R1_R5_mencho.csv"), fileEncoding = "cp932") |> 
+  select(
+    county_id = 1,
+    area = 33
+  ) |> 
+  mutate(across(c(area, county_id), as.numeric)) |> 
+  dplyr::filter(!is.na(area))
+```
+
+```{r}
+df_jp <- select_cols_jp(df_jp_raw)
+df_de <- select_cols_de(df_de_raw)
+df_jp_native <- select_cols_jp(df_jp_native_raw)
+```
+
+
+```{r}
+df_analysis <- df_de |>
+  create_scatter_df(total) |>  
+  dplyr::filter(year == 2019)
+
+df_analysis_a <- df_de |>
+  create_scatter_df(total) |> 
+  dplyr::filter(year == 2019)
+
+mean_de <- mean(df_analysis$ln_change_rate_total, na.rm = TRUE)
+sd_de <- sd(df_analysis$ln_change_rate_total, na.rm = TRUE)
+```
+
+## Urban
+
+```{r}
+df_cor <- readxl::read_xlsx(here::here('01_data', 'intermediate', 'german', "nuts_correspondence.xlsx")) |>
+    select(county_id, nuts_code3)
+
+df_geo_de_raw <- read_sf(
+  here::here('01_data', 'raw', 'mapping', 'NUTS250_N3.shp'))
+
+df_geo_de <- df_geo_de_raw |>
+  dplyr::filter(GF == 4) |> 
+  select(NUTS_CODE, geometry) |>
+  distinct() |>
+  mutate(
+    NUTS_CODE = if_else(NUTS_CODE == "DE734", "DE731", NUTS_CODE)
+  ) |>
+  summarise(geometry = st_union(geometry), .by = NUTS_CODE)
+```
+
+```{r}
+df_de_total <- read.csv(here("01_data", "intermediate", "german", "total_master.csv"))
+
+df_de_class <- df_de_total |> 
+  rename(total = population) |>
+  left_join(df_de_area, by = "county_id") |> 
+  mutate(density = total / area) |> 
+  dplyr::filter(year == 2019) |>
+  mutate(
+    class = case_when(
+      total >= 500000 ~ "big",
+      (density >= 150) & (total >=100000)  ~ "urban",
+      # density >= 100 ~ "mid",
+      # density < 100 ~ "rural",
+      TRUE ~ "rural"
+    )
+  ) 
+```
+
+```{r}
+df_de_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+```
+
+```{r}
+df_de_class |> 
+  left_join(df_cor, by = "county_id") |> 
+  left_join(df_geo_de, by = c("nuts_code3" = "NUTS_CODE")) |> 
+  distinct() |> 
+  st_as_sf() |>
+  st_make_valid() |>
+  ggplot() +
+  geom_sf(aes(fill = class)) +
+  theme_void() +
+    theme(
+      legend.position = "bottom",
+      title = element_text(size = 20),
+    ) 
+```
+
+
+```{r}
+de_prop <- df_de_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+
+prop_big <- de_prop |>
+  dplyr::filter(class == "big") |>
+  pull(prop)
+
+prop_urban <- de_prop |>
+  dplyr::filter(class == "urban") |>
+  pull(prop)
+
+prop_rural <- de_prop |>
+  dplyr::filter(class == "rural") |>
+  pull(prop)
+```
+
+## Japan
+
+総務省を参考にする
+https://www.soumu.go.jp/main_sosiki/jichi_gyousei/bunken/chihou-koukyoudantai_kubun.html
+
+- 政令指定都市: Big
+- 人口5万人以上: Urban
+- それ以外: Rural
+
+
+```{r}
+df_jp_total <- read.csv(here("01_data", "intermediate", "population", "both_master.csv"), fileEncoding = "cp932") |> 
+  select_cols_jp() |>
+  dplyr::filter(year == 2019)
+
+# jp_quantile <- quantile(df_jp_total$total, probs = c(1 - prop_big, 1 - (prop_urban + prop_big), 1 - prop_rural), na.rm = TRUE)
+
+list_jp_big <- list(
+  # Tokyo 23 distincts
+  "千代田区","中央区","港区","新宿区","文京区","台東区","墨田区",
+  "江東区","品川区","目黒区","大田区","世田谷区","渋谷区","中野区",
+  "杉並区","豊島区","北区","荒川区","板橋区","練馬区","足立区","葛飾区","江戸川区",
+  "大阪市",
+  "名古屋市",
+  "京都市",
+  "横浜市",
+  "神戸市",
+  "北九州市",
+  "札幌市",
+  "川崎市",
+  "福岡市",
+  "広島市",
+  "仙台市",
+  "千葉市",
+  "さいたま市",
+  "静岡市",
+  "堺市",
+  "新潟市",
+  "浜松市",
+  "岡山市",
+  "相模原市",
+  "熊本市"
+  )
+
+df_jp_class <- df_jp_total |>
+  dplyr::filter(year == 2019) |>
+  mutate(
+    class = case_when
+    (
+      county_name %in% list_jp_big ~ "big",
+      total >= 50000 ~ "urban",
+      TRUE ~ "rural"
+    ))
+
+df_jp_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+```
+
+
+```{r}
+# df_jp_geo_raw <- sf::read_sf(here("01_data", "raw", "geodata", "municipalities", "N03-19_190101 (4).json")) |>  
+df_jp_geo_raw <- sf::read_sf(here("01_data", "raw", "geodata", "municipalities", "municipalities.geojson")) |>  
+  select(
+    urban_name = 3,
+    county_name = 4,
+    county_id = 5,
+    geometry
+  ) |>
+  mutate(county_id = as.numeric(county_id))
+```
+
+```{r}
+adjust_geometry_jp <- function(df_jp_geo_raw, df_jp_total) {
+
+  df_id_name <- df_jp_total |>
+    select(county_id_new = county_id, county_name) |> 
+    dplyr::filter(county_name %in% list_jp_big)
+
+  df_output <- df_jp_geo_raw |>
+    left_join(df_id_name, by = c("urban_name" = "county_name")) |> 
+    mutate(
+      county_id = if_else(urban_name %in% list_jp_big, county_id_new, county_id),
+    ) |> 
+    select(
+      -county_id_new, -urban_name, -county_name
+    )
+}
+
+```
+
+```{r}
+#| eval: false
+df_jp_geo <- adjust_geometry_jp(df_jp_geo_raw, df_jp_total) |>
+  mutate(
+    geometry = st_cast(geometry)
+  )
+```
+
+
+```{r}
+#| eval: false
+# a <- df_jp_class |> 
+#   left_join(df_jp_geo, by = "county_id") 
+
+# bb <- a |> 
+#   st_as_sf() |>
+#   tm_shape() +
+#   tm_borders() +
+#   tm_polygons("class") +
+#   tm_layout(frame = FALSE)
+
+# tmap_save(bb, here("04_output", "figures","map", "jp_class.html"))
+
+# okinawa <- df_jp_class |>
+#   left_join(df_jp_geo, by = "county_id") |> 
+#   dplyr::filter(prefecture_name == "沖縄県") |>
+#   mutate(
+#     geometry = geometry+c(4.8, 14.5)
+#   ) |>
+#   st_as_sf()
+
+# df_jp_geo |> class()
+# okinawa |> class()
+# st_crs(df_jp_geo)
+# st_crs(okinawa)
+
+# jp_plot <- df_jp_class |> 
+#   left_join(df_jp_geo, by = "county_id") |> 
+#   dplyr::filter(prefecture_name != "沖縄県") |>
+#   bind_rows(okinawa) |> 
+#   st_as_sf() |>
+#   ggplot() +
+#   geom_sf(aes(fill = class)) +
+#   theme_void() +
+#     theme(
+#       legend.position = "bottom",
+#       title = element_text(size = 20),
+#     ) 
+
+# ggsave(here("04_output", "figures", "map", "jp_gg_okinawa.pdf"), jp_plot, width = 10, height = 10)
+```
+
+# Non-parametric regression
+
+Nadoraya-Watson kernel regression
+
+Standardized growth rate (Recerence to Gibrat's law for cities)
+
+## Germany
+
+### Total population
+
+```{r}
+create_ks_df <- function(year_i, df_input) {
+
+  print(year_i)
+
+  df_analysis <- df_input |>
+    create_scatter_df(total) |>
+    dplyr::filter(year == year_i) |>
+    dplyr::filter(!is.infinite(lag_ln_total))
+
+  mean_growth_rate <- mean(df_analysis$ln_change_rate_total, na.rm = TRUE)
+  sd_growth_rate <- sd(df_analysis$ln_change_rate_total, na.rm = TRUE)
+
+  df_analysis <- df_analysis |>
+    mutate(standard_y = (ln_change_rate_total - mean_growth_rate) / sd_growth_rate)
+
+  ks_fit <- ksmooth(df_analysis$lag_ln_total, df_analysis$standard_y, kernel = "normal", bandwidth = 0.5)
+
+  # ksmoothの結果をデータフレームに変換
+  df_fit <- data.frame(x = ks_fit$x, y = ks_fit$y) |>
+    mutate(year = year_i)
+}
+
+df_ks <- purrr::map(2014:2019, create_ks_df, df_de) |>
+  bind_rows()
+
+# ggplotで描写
+ggplot(df_ks, aes(x = x, y = y)) +
+  # geom_point(color = "gray", alpha = 0.6) +           # 元データ
+  geom_line(data = df_ks, aes(x = x, y = y)) +              # ksmooth回帰線
+  theme_bw() +
+  facet_wrap(~year)
+```
+
+## Japan
+```{r}
+df_ks_jp <- purrr::map(2014:2019, create_ks_df, df_jp) |>
+  bind_rows()
+
+# ggplotで描写
+ggplot(df_ks_jp, aes(x = x, y = y)) +
+  # geom_point(color = "gray", alpha = 0.6) + # 元データ
+  geom_line(data = df_ks_jp, aes(x = x, y = y)) + # ksmooth回帰線
+  theme_bw() +
+  facet_wrap(~year)
+```
+
+# Sample restriction
+
+```{r}
+modelsummary_mod <- function (model_input, title_n, gm = NULL) {
+
+  if(is.null(gm)) {
+    gm <- NA
+  } else {
+    gm <- tibble(
+      raw = c("nobs", "r.squared", "adj.r.squared"),
+      clean = c("N", "R2", "R2 adj"),
+      fmt = c(0, 3, 3)
+    )
+  }
+  
+  
+  model_based <- modelsummary::modelsummary(model_input, fmt = "%.4f", 
+                                        estimate =  "{estimate}{stars}",
+                                        stars = c('*' = .1, '**' = .05, '***' = .01),
+                                        # coef_rename = c("ln_lag_total" = "β1"),
+                                        gof_map = gm,
+                                        gof_omit = 'AIC|BIC|RMSE',
+                                        coef_omit = 1:1,
+                                        # title = title_n,
+                                        output = "data.frame")
+                                        # output = "html")
+  
+  results_model <- model_based 
+  
+  return(results_model)
+  
+}
+```
+
+
+## Without Syrian Arab Republic
+```{r}
+df_de_country <- read_xlsx(here("01_data", "intermediate", "german", "country_master.xlsx")) |>
+  change_country_name()
+```
+
+```{r}
+df_de_country_without_syr <- df_de_country |>
+  dplyr::filter(country_name != "Syrian Arab Republic") |>
+  summarise(
+    value = sum(population, na.rm = TRUE),
+    .by = c(year, county_id)
+  )
+```
+
+```{r}
+df_de |> 
+  create_scatter_df(total)
+```
+
+```{r}
+df_de_country_without_syr |> 
+  rename(total = value) |>
+  create_scatter_df(total) |>
+ggplot(aes(x = lag_ln_total, y = ln_change_rate_total)) +
+  geom_point() +
+  facet_wrap(~year)
+```
+
+```{r}
+
+lm_model_without_syr <- df_de_country_without_syr |>
+  rename(total = value) |>
+  create_scatter_df(total) |>
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  create_model_summary()
+
+
+```
+
+```{r}
+df_ks_without_syr <- purrr::map(2014:2019, create_ks_df, df_de_country_without_syr |> rename(total = value)) |>
+  bind_rows()
+
+# ggplotで描写
+ggplot(df_ks_without_syr, aes(x = x, y = y)) +
+  # geom_point(color = "gray", alpha = 0.6) + # 元データ
+  geom_line(data = df_ks_without_syr, aes(x = x, y = y)) + # ksmooth回帰線
+  theme_bw() +
+  facet_wrap(~year)
+```
+
+### Without Persons seeking protection
+
+Persons seeking protection: Administrative districts, reference date, sex, country groups/citizenship
+```{r}
+df_de_protection <- readxl::read_xlsx(here("01_data", "intermediate", "german", "protect_country.xlsx")) |>  
+  change_country_name() |> 
+  rename(protection = total) 
+
+df_de_without_protection <- df_de_country |>
+  left_join(df_de_protection, by = c("year", "county_id", "country_name")) |>
+  mutate(
+    total = population - protection
+  )
+```
+
+```{r}
+df_de_without_protection |> 
+  summarise(
+    total = sum(total, na.rm = TRUE),
+    .by = c(year, county_id)
+  ) |>
+  create_scatter_df(total) |> 
+  ggplot(aes(x = lag_ln_total, y = ln_change_rate_total)) +
+  geom_point() +
+  facet_wrap(~year)
+```
+
+
+### Compare with base
+```{r}
+model_base <- df_de |>
+  dplyr::filter(between(year, 2013, 2019)) |>
+  create_scatter_df(total) |>
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  modelsummary_mod(title_n = "Base Analysis") |>
+  mutate(model = "Base")
+```
+
+```{r}
+model_without_syr <- df_de_country_without_syr |>
+  rename(total = value) |>
+    dplyr::filter(between(year, 2013, 2019)) |>
+  create_scatter_df(total) |> 
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  modelsummary_mod(title_n = "Germany without Syrian Arab Republic") |>
+  mutate(model = "without_syr")
+```
+
+```{r}
+model_without_protection <- df_de_without_protection |> 
+  summarise(
+    total = sum(total, na.rm = TRUE),
+    .by = c(year, county_id)
+  ) |> 
+    dplyr::filter(between(year, 2013, 2019)) |>
+  create_scatter_df(total) |>
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  modelsummary_mod(title_n = "Germany without Persons seeking protection") |>
+  mutate(model = "without_protection")
+```
+
+```{r, results = "asis"}
+model_base |>
+  bind_rows(model_without_syr) |>
+  bind_rows(model_without_protection) |>
+    gt(
+    rowname_col = "row",
+    groupname_col = "model"
+  )
+```
+
+
+# Internal/International Migration Analysis
+## Compare the outcome by county class
+
+### Japan
+```{r}
+df_jp |> 
+  left_join(df_jp_class |> select(county_id, class)) |>
+  create_scatter_df(total) |> 
+  summarise(
+    mean_outcome = mean(ln_change_rate_total, na.rm = TRUE),
+    .by = class
+  )
+```
+
+### Germany
+```{r}
+df_de |>
+  left_join(df_de_class |> select(county_id, class)) |>
+  create_scatter_df(total) |> 
+  summarise(
+    mean_outcome = mean(ln_change_rate_total, na.rm = TRUE),
+    .by = class
+  )
+```
+
+
+
+# Line chart 2013 base
+
+```{r}
+add_growth_rate <- function(df_i, column_i, list_var_order) {
+
+  df_output <- df_i |>
+    arrange(!!! rlang::syms(list_var_order)) |>
+    # arrange(is_urban,region, year) |> View()
+    mutate(
+      base_13 = ifelse(year == 2013, !!sym(column_i), NA)
+      ) |> 
+    fill(base_13, .direction = "down") |>
+    mutate(
+      growth_rate = round((!!sym(column_i) / base_13)*100, digits = 3)
+    ) |>
+    select(-base_13)
+}
+
+
+generate_df_plot <- function(df, df_native, list_var_order) {
+
+  df_sum <- df |>
+    summarise(
+      total = sum(total, na.rm = TRUE),
+      .by = year
+    ) |> 
+    add_growth_rate("total", list_var_order) 
+
+  df_sum_native <- df_native |>
+    summarise(
+      total = sum(total_native, na.rm = TRUE),
+      .by = year
+    ) |>
+    add_growth_rate("total", list_var_order) |>
+    rename(
+      growth_rate_native = growth_rate,
+      total_native = total) 
+
+
+  df_plot <- df_sum |>
+    left_join(df_sum_native) |> 
+    select(-starts_with("total")) |> 
+    pivot_longer(
+      cols = -c(year),
+      names_to = "country",
+      values_to = "value"
+    )
+}
+
+
+plot_line_chart <- function(df_plot, var_color) {
+
+  var_color <- enquo(var_color)
+
+  plot_output <- df_plot |>
+    ggplot(aes(x = year, y = value, color = !!var_color)) + 
+    geom_point() +
+    geom_line() +
+    theme_bw() +
+    scale_x_continuous(
+      breaks = seq(2013, 2019, 1),
+      limits = c(2013, 2019)
+      )
+
+  return(plot_output)
+}
+
+
+plot_line_chart_urban <- function(df_pref_urban, var_color) {
+
+  var_color <- enquo(var_color)
+
+  plot_output <- df_pref_urban |>
+    ggplot(aes(x = year, y = value, color = region)) + 
+    # ggplot(aes(x = year, y = value, color = !!var_color)) + 
+    geom_point() +
+    geom_line() +
+    theme_bw() +
+    scale_x_continuous(
+      breaks = seq(2013, 2019, 1),
+      limits = c(2013, 2019)
+      ) +
+    facet_wrap(~is_urban)
+
+  return(plot_output)
+}
+
+```
+
+```{r}
+# country classification
+df_country_class <- read.csv(here("01_data", "raw", "country_classification", "country_classification.csv")) |> 
+janitor::clean_names() |> 
+  select(iso_code, country_name, cls_income = x2019) |> 
+  mutate(
+    cls_income = case_when(
+      cls_income == "H" ~ "high",
+      cls_income == "UM" ~ "upper_middle",
+      cls_income == "LM" ~ "lower_middle",
+      cls_income == "L" ~ "low",
+      TRUE ~ cls_income
+    )
+  ) |>
+  mutate(
+    country_name = case_when(
+      country_name == "H" ~ "high",
+      country_name == "UM" ~ "upper_middle",
+      country_name == "LM" ~ "lower_middle",
+      country_name == "L" ~ "low",
+      TRUE ~ country_name
+    )
+  ) |>
+  mutate(
+    country_name = if_else(str_detect(country_name, "d'Ivoire"), "Cote d'Ivoire", country_name),
+    country_name = if_else(str_detect(country_name, "Tom and Pr_cipe"), "Sao Tome and Principe", country_name)
+    )
+```
+
+
+### Japan
+```{r}
+# Plot
+df_plot_13_jp <- generate_df_plot(df = df_jp_raw, df_jp_native |> select(total_native = total, year, county_id), list_var_order = NULL)
+```
+
+### Germany
+
+```{r}
+df_plot_13_de <- generate_df_plot(df = df_de_raw, df_de_native |> select(total_native = total, year, county_id), list_var_order = NULL)
+```
+
+```{r}
+plot_line_chart(df_plot_13_jp, country) + plot_line_chart(df_plot_13_de, country) +
+plot_layout(
+  guides = "collect",
+  ncol = 2,
+  nrow = 1
+) &
+theme(
+  legend.position = "bottom",
+  legend.title = element_blank(),
+  legend.text = element_text(size = 10),
+  plot.title = element_text(size = 20)
+)
+```
+
+
+
+```{r}
+df_de_country <- read_xlsx(here("01_data", "intermediate", "german", "country_master.xlsx"))
+
+df_de_country <- df_de_country |>
+  change_country_name() |>
+  left_join(df_country_class, by = "country_name")
+```
+
+
+- 国の収入カテゴリー別推移
+  - lowでは、急激に増えているところは、シリア、アフガニスタン。
+
+```{r}
+df_de_country |>
+  # dplyr::filter(country_name != "Syrian Arab Republic") |>
+  # dplyr::filter(country_name != "Afghanistan") |>
+  summarise(
+    value = sum(population, na.rm = TRUE),
+    .by = c(year, cls_income)
+  ) |>
+  # dplyr::filter(cls_income == "low") 
+  plot_line_chart(cls_income)
+
+# df_de_country |> 
+#   dplyr::filter(cls_income == "low") |> 
+#   summarise(
+#     total = sum(population, na.rm = TRUE),
+#     .by = c(year, country_name)    
+#   ) |>
+#   mutate(
+#     growth_rate = total / dplyr::lag(total),
+#     .by = country_name
+#     ) |>
+#   mutate(
+#     total_year = sum(total),
+#     .by = year
+#     ) |> 
+#   mutate(
+#     share = total / total_year
+#     ) |> 
+#   arrange(country_name) 
+```
+
+### Without Syrian Arab Republic
+
+```{r}
+df_de_country |>
+  dplyr::filter(country_name != "Syrian Arab Republic") |>
+  dplyr::filter(country_name != "Afghanistan") |>
+  summarise(
+    value = sum(population, na.rm = TRUE),
+    .by = c(year, cls_income)
+  ) |>
+  # dplyr::filter(cls_income == "low") 
+  plot_line_chart(cls_income)
+```
+
+```{r}
+df_pref_region <- read_xlsx(here("01_data", "intermediate", "foreign_status", "prefecture_by_region.xlsx"))
+
+# By Urban and Rural
+list_urban_pref <- c("東京", "神奈川", "埼玉", "千葉", "大阪", "愛知")
+
+df_pref_urban <- df_pref_region |> 
+  mutate(is_urban = ifelse(prefecture %in% list_urban_pref, "Urban", "Rural")) |> 
+  summarise(
+    total = sum(population, na.rm = TRUE),
+    .by = c(year, is_urban, region)
+  ) |>
+  add_growth_rate("total", list_var_order = c("is_urban", "region", "year")) |> 
+  rename(value = growth_rate)
+```
+
+```{r}
+df_de_county_region <- read_xlsx(here("01_data", "intermediate", "german", "population_region.xlsx")) |>  
+  dplyr::filter(
+    between(year, 2013, 2019),
+    region != "Total" 
+    ) |> 
+  left_join(df_de_class |> select(county_id, class), by = "county_id") |>  
+  dplyr::filter(is.na(class)) |> 
+  summarise(
+    total = sum(population, na.rm = TRUE),
+    .by = c(year, class, region)
+  ) |>
+  add_growth_rate("total", list_var_order = c("class", "region", "year")) |> 
+  rename(value = growth_rate)  
+```
+
+
+# Rural analysis
+
+```{r}
+df_de_income_scale <- df_de_country |> 
+  left_join(df_de_class |> select(county_id, county_name, class)) |> 
+  left_join(df_country_class |> select(country_name, cls_income))
+```
+
+
+```{r}
+#| eval: false 
+detect_scale_city <- function() {
+
+
+
+}
+
+df_de_class_income <- df_de_income_scale |> 
+  # dplyr::filter(class == "rural") |> 
+  summarise(
+    total = sum(population, na.rm = TRUE),
+    .by = c(year, county_id, county_name, cls_income, class)
+  ) |> 
+  arrange(county_id, cls_income, year) |> 
+  mutate(
+    ln_total = log(total),
+    lag_ln_total = dplyr::lag(log(total), n = 1),
+    # ln_change_rate_total = log(!!var_y) - dplyr::lag(log(!!var_y), n = lag_i),
+    ln_change_rate_total = ln_total - lag_ln_total,
+    .by = c(county_id, county_name, cls_income, class)
+  ) |>
+  mutate(ln_change_rate_total = Winsorize(ln_change_rate_total, val = quantile(ln_change_rate_total, probs = c(0.01, 0.99), na.rm = TRUE)), .by = year)
+
+df_mean_sd <- df_de_class_income |>
+  summarise(
+    mean_outcome = mean(ln_change_rate_total, na.rm = TRUE),
+    sd_outcome = sd(ln_change_rate_total, na.rm = TRUE),
+    .by = c(cls_income, class)
+  )
+
+```
+
+### Compare class and country income level
+
+# Linear model analysis
+
+```{r}
+
+```
+
+
+# Region share
+```{r}
+### continent data
+df_de_continent <- read_xlsx(here("01_data", "intermediate", "german", "population_region.xlsx")) |> 
+  dplyr::filter(between(year, 2013, 2019)) |> 
+  pivot_wider(
+    names_from = region,
+    values_from = population
+  ) |>
+  janitor::clean_names() |> 
+  select(
+    county_id, year, 
+    europe, 
+    africa, 
+    north_america, 
+    south_america, 
+    asia, 
+    australia_and_oceania
+  )
+```
+
+```{r}
+
+df_region_share <- df_de |>
+  # left_join(df_de_native, by = c("year", "county_id")) |>
+  # left_join(df_de_gender, by = c("year", "county_id")) |>
+  left_join(df_de_class |> select(county_id, class), by = "county_id") |>
+  left_join(df_de_continent, by = c("year", "county_id")) 
+```
+
+```{r}
+df_bar_share <- df_region_share |>
+  mutate(
+    europe_share = europe / total,
+    asia_share = asia / total,
+    africa_share = africa / total,
+    north_america_share = north_america / total,
+    south_america_share = south_america / total,
+    australia_and_oceania_share = australia_and_oceania / total
+  ) |>
+  summarise(
+    europe_share = mean(europe_share, na.rm = TRUE),
+    asia_share = mean(asia_share, na.rm = TRUE),
+    africa_share = mean(africa_share, na.rm = TRUE),
+    north_america_share = mean(north_america_share, na.rm = TRUE),
+    south_america_share = mean(south_america_share, na.rm = TRUE),
+    australia_and_oceania_share = mean(australia_and_oceania_share, na.rm = TRUE),
+    .by = c(year, class)
+  ) |>
+  pivot_longer(
+    cols = -c(year, class),
+    names_to = "region",
+    values_to = "share"
+  )
+df_bar_share |>
+  dplyr::filter(year %in% c(2013, 2016, 2019)) |>
+  ggplot() +
+  geom_bar(
+    mapping = aes(x = year,
+    y = share, fill = region),
+    position="stack", stat="identity") +
+    facet_wrap(~class, ncol = 1) +
+    theme_bw() +
+    coord_flip() +
+    scale_x_continuous(
+      breaks = c(2013, 2016, 2019)
+    ) +
+    theme(
+      legend.position = "bottom",
+      legend.title = element_blank(),
+      legend.text = element_text(size = 10),
+      plot.title = element_text(size = 20)
+    )
+```
+
+
+# International migration
+
+```{r}
+add_int_change <- function(df) {
+
+  df_output <- df |>
+    arrange(county_id, year) |>
+    mutate(
+      lag_total = dplyr::lag(total, n = 1),
+      .by = county_id
+    ) |>
+    mutate(
+      internal_total = dplyr::lag(total, n = 1) + add_internal - exit_internal,
+      external_total = dplyr::lag(total, n = 1) + add_external - exit_external,
+      .by = county_id
+    ) |>
+    mutate(
+      lag_ln_total = dplyr::lag(log(total), n = 1),
+      ln_change_rate_internal = log(internal_total) - log(lag_total),
+      ln_change_rate_external = log(external_total) - log(lag_total),
+    )
+}
+
+```
+
+
+```{r}
+df_de_int <- add_int_change(df_de)
+df_jp_int <- add_int_change(df_jp) |>
+  dplyr::filter(
+    internal_total > 0,
+    external_total > 0)
+```
+
+## Germany
+
+```{r}
+create_scatter_int(input_df = df_de_int, var_x = lag_ln_total, var_y = ln_change_rate_internal)
+```
+
+```{r}
+create_scatter_int(input_df = df_de_int, var_x = lag_ln_total, var_y = ln_change_rate_external)
+```
+
+```{r}
+lm_de_internal <- create_lm(df_de_int, "ln_change_rate_internal", "lag_ln_total") |>
+  modelsummary_mod() |>
+  mutate(model = "internal")
+lm_de_external <- create_lm(df_de_int, "ln_change_rate_external", "lag_ln_total") |>
+  modelsummary_mod() |>
+  mutate(model = "external")
+```
+
+```{r}
+lm_de_internal |>
+  bind_rows(lm_de_external) |>
+  gt(
+    rowname_col = "row",
+    groupname_col = "model"
+  )
+```
+
+
+## Japan
+
+### Internal migration
+```{r}
+create_scatter_int(input_df = df_jp_int, var_x = lag_ln_total, var_y = ln_change_rate_internal)
+```
+
+### External migration
+```{r}
+create_scatter_int(input_df = df_jp_int, var_x = lag_ln_total, var_y = ln_change_rate_external)
+```
+
+```{r}
+lm_jp_internal <- create_lm(df_jp_int, "ln_change_rate_internal", "lag_ln_total") |>
+  modelsummary_mod(gm = "a") |>
+  mutate(model = "internal")
+
+lm_jp_external <- create_lm(df_jp_int, "ln_change_rate_external", "lag_ln_total") |>
+  modelsummary_mod(gm = "a") |>
+  mutate(model = "external")
+```
+
+```{r}
+lm_jp_internal |>
+  bind_rows(lm_jp_external) |>
+  gt(
+    rowname_col = "row",
+    groupname_col = "model"
+  )
+```

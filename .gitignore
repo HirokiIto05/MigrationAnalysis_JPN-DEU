@@ -1,0 +1,20 @@
+# except this file
+!.gitignore
+
+# ignore all files in this directory
+99_other/
+01_data/intermediate/
+01_data/raw/
+01_data/document/
+04_output/
+
+# ignore all files with these extensions
+*.exe
+*.html
+*.png
+*.pdf
+*.zip
+
+# keep folder structure
+# !/00.cover/.gitkeep
+# !*.gitkeep

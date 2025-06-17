@@ -1,0 +1,245 @@
+---
+title: "0917 report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+    fig-width: 12
+    fig-height: 8
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+
+
+
+```{r}
+library(here)
+source(here("05_config", "packages.R"))
+```
+
+
+```{r}
+#| label: read data
+df_region_input <- read_csv(here("01_data/intermediate/foreign_status/total_by_region.csv"), locale = locale(encoding = "cp932"))
+
+df_prefecture_input <- read_csv(here("01_data/intermediate/foreign_status/prefecture_by_status.csv"), locale = locale(encoding = "cp932"))
+
+df_prefecture_input |> select(-starts_with("lag"), -starts_with("ln"))  |> 
+summarise(
+  total = sum(total_foreign),
+  status = sum(status),
+  high_skill = sum(high_skill),
+  low_skill = sum(low_skill),
+  # training = sum(training),
+  other = sum(other),
+  specific = sum(specific_permanent_resident),
+  except_specific = sum(),
+  .by = year
+)
+```
+
+
+```{r}
+#| label: clean data
+df_prefecture <- df_prefecture_input |>
+  select(
+    prefecture_name, 
+    year, 
+    total_foreign,
+    except_specific,
+    high_skill,
+    low_skill,
+    training
+    ) |>
+  mutate(
+    dummy_urban = case_when(
+      prefecture_name %in% c("東京", "神奈川", "埼玉", "千葉", "大阪", "愛知") ~ "urban_area",
+      TRUE ~ "not_urban_area"
+    )
+  ) |>
+  filter(year <= 2021)
+```
+
+## Transition of total foreign residents
+
+外国人人口：特別在留資格者を除く。
+
+Urban area : 東京, 神奈川, 埼玉, 千葉, 大阪, 愛知 \  
+
+両者とも人口増加しているが、3大都市圏以外の地域の変化率が大きい。
+
+```{r}
+df_plot <- df_prefecture |> 
+  summarise(
+    total = sum(except_specific),
+    .by = c(year, dummy_urban)
+  ) |>
+  arrange(dummy_urban, year) |>
+  mutate(
+    change_rate = total / lag(total),
+    .by = dummy_urban
+  ) |>
+  filter(between(year, 2013, 2019))
+```
+
+
+```{r}
+plot_level <- ggplot(df_plot, aes(x = year, y = total, color = dummy_urban)) +
+  # ggplot(aes(x = year, y = change_rate, color = dummy_urban)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  labs(
+    title = "Total number",
+  ) +
+  scale_x_continuous(breaks = seq(2013, 2019, 1))
+
+plot_rate <- ggplot(df_plot, aes(x = year, y = change_rate, color = dummy_urban)) +
+  # ggplot(aes(x = year, y = change_rate, color = dummy_urban)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  labs(
+    title = "Change rate",
+  ) +
+  scale_x_continuous(breaks = seq(2013, 2019, 1))
+```
+
+```{r}
+plot_level + plot_rate + 
+  plot_layout(
+    ncol = 1,
+    guides =  "collect") &
+    theme(legend.position = "bottom") &
+    theme(
+      plot.title = element_text(size = 15),
+      axis.text = element_text(size = 20),
+      # axis.text = element_text(size = 22),
+      legend.text = element_text(size = 20),
+      legend.title = element_blank(),
+      axis.title = element_blank()
+    )
+```
+
+
+## Transition of foreign residents by status
+
+高技能者は3大都市圏で増加している一方で、技能実習生は3大都市圏以外で増加している。
+
+```{r}
+df_plot <- df_prefecture |> 
+  summarise(
+    # total = sum(total_foreign),
+    high_skill = sum(high_skill),
+    # low_skill = sum(low_skill),
+    training = sum(training),
+    .by = c(dummy_urban, year)
+  ) |>
+  pivot_longer(
+    cols = -c(dummy_urban, year),
+    names_to = "category",
+    values_to = "value"
+  ) 
+
+```
+
+
+```{r}
+la <- c("high_skill" = "高技能", "training" = "技能実習生")
+# ggplot(df_plot_prefecture, aes(x = year, y = value, color = category)) +
+ggplot(df_plot, aes(x = year, y = value, color = dummy_urban)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~category, nrow = 2) +
+  scale_x_continuous(
+    breaks = seq(2010, 2021, 1)
+  ) +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(size = 15),
+    plot.title = element_text(size = 15),
+    axis.text.y = element_text(size = 20),
+    axis.text.x = element_text(
+      angle = 75,
+      hjust = 1,
+      size = 20),
+    axis.title = element_text(size = 22),
+    legend.text = element_text(size = 20),
+    legend.title = element_blank(),
+    legend.position = "bottom"
+  ) 
+  # scale_color_manual(
+	#   name = element_blank(),
+	#   labels = c("高技能", "技能実習生"),
+	#   values = c("high_skill" = "#222222", "training" = "#A3A3A3")
+	# ) 
+　
+```
+
+
+
+## Transition of foreign residents by Regiom
+
+
+```{r}
+df_prefecture_by_region <- openxlsx::read.xlsx(here("01_data/intermediate/foreign_status/prefecture_by_region.xlsx"))
+
+df_specific_permanent_resident <- df_prefecture_input |>
+  select(
+    prefecture_name, 
+    year, 
+    specific_permanent_resident
+  ) |>
+  filter(between(year, 2013, 2020))
+```
+
+
+```{r}
+df_plot <- df_prefecture_by_region |> 
+  left_join(df_specific_permanent_resident, by = c("prefecture" = "prefecture_name", "year")) |>  
+  mutate(
+    population = if_else(region == "Asia", population - specific_permanent_resident, population),
+    dummy_urban = case_when(
+      prefecture %in% c("東京", "神奈川", "埼玉", "千葉", "大阪", "愛知") ~ "urban_area",
+      TRUE ~ "not_urban_area"
+    )
+  ) |> 
+  summarise(
+    value = sum(population, na.rm = TRUE),
+    .by = c(year, region, dummy_urban)
+  ) 
+```
+
+```{r}
+ggplot(df_plot |> filter(region != "Unknown"), aes(x = year, y = value, color = dummy_urban)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~region, scales = "free_y", ncol = 2) +
+  scale_x_continuous(
+    breaks = seq(2013, 2020, 1)
+  ) +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(size = 15),
+    plot.title = element_text(size = 15),
+    axis.text.y = element_text(size = 20),
+    axis.text.x = element_text(
+      angle = 75,
+      hjust = 1,
+      size = 20),
+    axis.title = element_text(size = 22),
+    legend.text = element_text(size = 20),
+    legend.title = element_blank(),
+    legend.position = "bottom"
+  ) 
+
+
+```

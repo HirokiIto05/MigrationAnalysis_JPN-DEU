@@ -1,0 +1,14 @@
+
+```{python}
+from pygenesis.py_genesis_client import PyGenesisClient
+
+client = PyGenesisClient(site='DESTATIS', username='DEW5ZP978P', password='rZ5hr&%3ytlc')
+```
+
+
+```{python}
+
+df = client.download_csv('12521-0044', 'data.csv')
+
+
+```

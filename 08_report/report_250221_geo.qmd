@@ -1,0 +1,336 @@
+---
+title: "250299 geo"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+
+
+```{r}
+library(viridisLite)
+library(viridis)
+library(gcookbook)
+library(DescTools)
+library(tidyverse)
+library(sf)
+library(tmap)
+library(tmaptools)
+library(RColorBrewer)
+library(htmlwidgets)
+library(leaflet)
+library(leafem)
+```
+
+
+```{r}
+# Load raw data
+df_jp_raw <- read.csv(here("01_data", "intermediate", "population", "overseas_master.csv"), fileEncoding = "cp932")
+df_de_raw <- read.csv(here("01_data", "intermediate", "german", "foreign_master.csv"))
+
+df_jp_native_raw <- read.csv(here("01_data", "intermediate", "population", "japanese_master.csv"), fileEncoding = "cp932")
+df_de_native <- read.csv(here("01_data", "intermediate", "german", "native_master.csv")) |>
+  select(-total_foreign) |>
+  rename(total = population)
+```
+
+```{r}
+# Area data
+df_de_area <- readxl::read_xlsx(here("01_data", "raw", "german", "area",  "area.xlsx")) |>
+  select(
+    county_id = 1,
+    area = 3
+  ) |>
+  mutate(across(c(area, county_id), as.numeric)) |>
+  dplyr::filter(!is.na(area))
+
+df_jp_area <- read.csv(here("01_data", "raw", "area",  "R1_R5_mencho.csv"), fileEncoding = "cp932") |> 
+  select(
+    county_id = 1,
+    area = 33
+  ) |> 
+  mutate(across(c(area, county_id), as.numeric)) |> 
+  dplyr::filter(!is.na(area))
+
+```
+
+```{r}
+select_cols_jp <- function(df_jp) {
+
+  df_output <- df_jp |>
+    select(
+      county_id = city_id, county_name = city_name, prefecture_name, year, total,
+      add = moving_in_total,
+      add_internal = moving_in_dom,
+      add_external = moving_in_int,
+      add_birth = birth,
+      exit = moving_out_total,
+      exit_internal = moving_out_dom,
+      exit_external = moving_out_int,
+      exit_death = mortality
+    )
+}
+
+
+select_cols_de <- function(df_de) {
+
+  df_output <- df_de |>
+    select(
+      county_id, county_name, year, total = total_value,
+      add = additions,
+      add_internal = addition_internal,
+      add_external = addition_international,
+      add_birth = addition_by_birth,
+      exit = exits,
+      exit_internal = exit_internal,
+      exit_external = extis_international,
+      exit_death = exit_by_death
+    )
+}
+
+```
+
+```{r}
+create_scatter_df <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
+
+  var_y <- enquo(var_y)
+  
+  plot_based_df <- input_df |> 
+    arrange(county_id, year) |> 
+    mutate(
+      ln_total = log(!!var_y),
+      lag_ln_total = dplyr::lag(log(!!var_y), n = lag_i),
+      ln_change_rate_total = log(!!var_y) - dplyr::lag(log(!!var_y), n = lag_i),
+      # ln_total = log(net_internal),
+      # lag_ln_total = dplyr::lag(log(net_internal)),
+      # ln_change_rate_total = log(net_internal) - dplyr::lag(log(net_internal)),
+      .by = county_id
+    ) |>  
+    mutate(ln_change_rate_total = Winsorize(ln_change_rate_total, val = quantile(ln_change_rate_total, probs = c(0.01, 0.99), na.rm = TRUE)), .by = year)  |> 
+    # dplyr::filter(!total < 100) |>
+    dplyr::slice_max(prop = cutoff, order_by = total, by = "year") 
+}
+```
+
+```{r}
+create_scatter <-  function(input_df, var_x, cutoff = 1){
+
+  var_x <- enquo(var_x)
+  
+  plot_based_df <- input_df |> 
+    arrange(year) |>
+    mutate(
+      ln_total = log(total),
+      lag_ln_total = dplyr::lag(log(total)),
+      ln_change_rate_total = log(total) - dplyr::lag(log(total)),
+      .by = county_id
+    )  |>
+    # mutate(across(ln_change_rate_total, ~Winsorize(., na.rm = TRUE, probs = c(0.01, 0.99))), .by = year) 
+    mutate(ln_change_rate_total = Winsorize(ln_change_rate_total, val = quantile(ln_change_rate_total, probs = c(0.01, 0.99), na.rm = TRUE)), .by = year) |>
+    # dplyr::filter(!total < 100)
+    dplyr::slice_max(prop = cutoff, order_by = total, by = "year") 
+
+  output_plot <- ggplot(plot_based_df |> dplyr::filter(year != 2013),
+                       aes(x = !!var_x, y = ln_change_rate_total)) +
+    geom_point(alpha = 0.5, colour = "#333333",
+               fill = "#333333") +
+    theme_bw(base_family = "HiraKakuPro-W3") +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 22),
+      strip.text.x = element_text(size = 20)
+      ) +
+    geom_hline(yintercept = 0,
+               linewidth = 0.6,
+               colour = "black",
+               linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ year,
+               scales = "free") 
+    # scale_x_continuous(breaks = c(5, 10)) +
+    # scale_y_continuous(
+    #   breaks = c(-2, -1, 0, 1, 2),
+    #   limits = c(-2, 2)
+    # )
+  
+  return(output_plot)
+}
+```
+
+
+```{r}
+df_jp <- select_cols_jp(df_jp_raw)
+df_de <- select_cols_de(df_de_raw)
+
+
+df_jp_native <- select_cols_jp(df_jp_native_raw)
+```
+
+
+```{r}
+plot_tmap <- function(year_n, df_map_analysis, var_y)  {
+  
+  var_y <- rlang::enquo(var_y)
+  
+  # df_based <- df_input |> 
+    # dplyr::filter(year == year_n)
+
+  # rank_var <- df_based |> 
+    # dplyr::pull(!!var_x)
+    # dplyr::pull(ln_change_rate_total)
+  
+  breaks_i <- seq(-0.8, 0.6, 0.2)
+
+  df_st <- df_map_analysis |> 
+    dplyr::filter(between(year, 2018, 2020)) |>
+    mutate(
+    #   y = case_when(
+    #   (ln_change_rate_total < 0) ~ " ~ 0 ",
+    #   (ln_change_rate_total >= 0) & (ln_change_rate_total < 0.05) ~ "0 ~ .05",
+    #   (ln_change_rate_total >= 0.05) & (ln_change_rate_total < 0.1) ~ ".05 ~ .1",
+    #   (ln_change_rate_total >= 0.1) & (ln_change_rate_total < 0.15) ~ ".1 ~ .15",
+    #   (ln_change_rate_total >= 0.15) & (ln_change_rate_total < 0.2) ~ ".15 ~ .2",
+    #   (ln_change_rate_total >= 0.2) ~ ".2 ~"
+    #   )
+    # ) |> 
+    y = case_when(
+      (ln_change_rate_total < 0) ~ " ~ 0 ",
+      (ln_change_rate_total >= 0) & (ln_change_rate_total < 0.2) ~ "0 ~ .2",
+      (ln_change_rate_total >= 0.2) & (ln_change_rate_total < 0.4) ~ ".2 ~ .4",
+      (ln_change_rate_total >= 0.4) & (ln_change_rate_total < 0.6) ~ ".4 ~ .6",
+      (ln_change_rate_total >= 0.6) & (ln_change_rate_total < 0.8) ~ ".6 ~ .8",
+      (ln_change_rate_total >= 0.8) & (ln_change_rate_total <= 1.0) ~ ".8 ~ 1.0"
+    )
+    ) |> 
+    mutate(y = factor(y, levels = c(" ~ 0 ", "0 ~ .2", ".2 ~ .4", ".4 ~ .6", ".6 ~ .8", ".8 ~ 1.0"))) |>
+    # dplyr::filter(year == 2015) |>
+    st_as_sf()
+
+
+  map_output <- 
+    ggplot() +
+    geom_sf(data = df_st, aes(fill = y)) +
+    # 背景色を白にする
+    theme_void() +
+    facet_wrap(~ year) +
+    theme(
+      legend.position = "bottom",
+      title = element_text(size = 20),
+    ) +
+    scale_fill_brewer()
+  
+  return(map_output)
+}
+```
+
+
+```{r}
+df_cor <- readxl::read_xlsx(here::here('01_data', 'intermediate', 'german', "nuts_correspondence.xlsx")) |>
+    select(county_id, nuts_code3)
+
+df_geo <- read_sf(here::here(
+  '01_data', 'raw', 'mapping', 'NUTS250_N3.shp')) |>
+  dplyr::filter(GF == 4) |>
+  select(NUTS_CODE, geometry) |>
+  distinct()
+
+df_de_map <- df_de |>
+  left_join(df_cor, by = "county_id") |>
+  left_join(df_geo, by = c("nuts_code3" = "NUTS_CODE"))
+
+df_map_analysis <- create_scatter_df(df_de_map, total, lag_i = 6)
+
+df_map_analysis |> ggplot(aes(x = ln_change_rate_total)) +
+  geom_histogram()
+```
+
+```{r}
+#| fig-height: 20
+#| fig-width: 16
+plot_tmap(2019, df_map_analysis, ln_change_rate_total)
+```
+
+```{r}
+df_share <- df_map_analysis |>
+  left_join(df_de_native |> select(county_id, year, native = total), by = c("county_id", "year")) |> 
+  mutate(
+    share = 100* (total / sum(total + native, na.rm = TRUE)),
+    .by = year
+  )
+```
+
+```{r}
+year_i <- 2013
+plot_tmap_share <- function(year_i, df_share, var_y)  {
+  
+  var_y <- rlang::enquo(var_y)
+
+  df_st <- df_share |> 
+    dplyr::filter(year == year_i) 
+
+  df_st |> select(-geometry) |> 
+  df_st |> ggplot(aes(share)) +
+    geom_histogram()
+    # mutate(
+    #   y = case_when(
+    #   (ln_change_rate_total < 0) ~ " ~ 0 ",
+    #   (ln_change_rate_total >= 0) & (ln_change_rate_total < 0.05) ~ "0 ~ .05",
+    #   (ln_change_rate_total >= 0.05) & (ln_change_rate_total < 0.1) ~ ".05 ~ .1",
+    #   (ln_change_rate_total >= 0.1) & (ln_change_rate_total < 0.15) ~ ".1 ~ .15",
+    #   (ln_change_rate_total >= 0.15) & (ln_change_rate_total < 0.2) ~ ".15 ~ .2",
+    #   (ln_change_rate_total >= 0.2) ~ ".2 ~"
+    #   )
+    # ) |> 
+    # y = case_when(
+    #   (ln_change_rate_total < 0) ~ " ~ 0 ",
+    #   (ln_change_rate_total >= 0) & (ln_change_rate_total < 0.2) ~ "0 ~ .2",
+    #   (ln_change_rate_total >= 0.2) & (ln_change_rate_total < 0.4) ~ ".2 ~ .4",
+    #   (ln_change_rate_total >= 0.4) & (ln_change_rate_total < 0.6) ~ ".4 ~ .6",
+    #   (ln_change_rate_total >= 0.6) & (ln_change_rate_total < 0.8) ~ ".6 ~ .8",
+    #   (ln_change_rate_total >= 0.8) & (ln_change_rate_total <= 1.0) ~ ".8 ~ 1.0"
+    # )
+    # ) |> 
+    # mutate(y = factor(y, levels = c(" ~ 0 ", "0 ~ .2", ".2 ~ .4", ".4 ~ .6", ".6 ~ .8", ".8 ~ 1.0"))) |>
+    # dplyr::filter(year == 2015) |>
+    st_as_sf()
+
+  map_output <- 
+    ggplot() +
+    geom_sf(data = df_st, aes(fill = share)) +
+    # 背景色を白にする
+    theme_void() +
+    # facet_wrap(~ year) +
+    theme(
+      legend.position = "bottom",
+      title = element_text(size = 20),
+    ) 
+    # scale_fill_brewer()
+
+  return(map_output)
+}
+```

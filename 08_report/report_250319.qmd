@@ -1,0 +1,901 @@
+---
+title: "250319 report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+```{r}
+library(DescTools)
+library(sf)
+library(tmap)
+library(tmaptools)
+library(RColorBrewer)
+library(htmlwidgets)
+library(leaflet)
+library(leafem)
+# source(here::here("05_config", "packages.R"))
+```
+
+
+```{r}
+# Load raw data
+df_jp_raw <- read.csv(here("01_data", "intermediate", "population", "overseas_master.csv"), fileEncoding = "cp932") |>
+  dplyr::filter(between(year, 2013, 2019))
+df_de_raw <- read.csv(here("01_data", "intermediate", "german", "foreign_master.csv")) |>
+  dplyr::filter(between(year, 2013, 2019))
+
+df_jp_native_raw <- read.csv(here("01_data", "intermediate", "population", "japanese_master.csv"), fileEncoding = "cp932") |>
+  dplyr::filter(between(year, 2013, 2019))
+df_de_native <- read.csv(here("01_data", "intermediate", "german", "native_master.csv")) |>
+  select(-total_foreign) |>
+  rename(total = population) |>
+  dplyr::filter(between(year, 2013, 2019))
+```
+
+```{r}
+# Area data
+df_de_area <- readxl::read_xlsx(here("01_data", "raw", "german", "area",  "area.xlsx")) |>
+  select(
+    county_id = 1,
+    area = 3
+  ) |>
+  mutate(across(c(area, county_id), as.numeric)) |>
+  dplyr::filter(!is.na(area))
+
+df_jp_area <- read.csv(here("01_data", "raw", "area",  "R1_R5_mencho.csv"), fileEncoding = "cp932") |> 
+  select(
+    county_id = 1,
+    area = 33
+  ) |> 
+  mutate(across(c(area, county_id), as.numeric)) |> 
+  dplyr::filter(!is.na(area))
+
+```
+
+```{r}
+select_cols_jp <- function(df_jp) {
+
+  df_output <- df_jp |>
+    select(
+      county_id = city_id, county_name = city_name, prefecture_name, year, total,
+      add = moving_in_total,
+      add_internal = moving_in_dom,
+      add_external = moving_in_int,
+      add_others = moving_in_others,
+      birth,
+      exit = moving_out_total,
+      exit_internal = moving_out_dom,
+      exit_external = moving_out_int,
+      exit_others = moving_out_others,
+      death = mortality
+    )
+}
+
+select_cols_de <- function(df_de) {
+
+  df_output <- df_de |>
+    select(
+      county_id, county_name, year, total = total_value,
+      add = additions,
+      add_internal = addition_internal,
+      add_external = addition_international,
+      birth = addition_by_birth,
+      exit = exits,
+      exit_internal = exit_internal,
+      exit_external = extis_international,
+      death = exit_by_death
+    )
+}
+
+```
+
+##### Estimation functions
+```{r}
+create_scatter_df <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
+
+  var_y <- enquo(var_y)
+  
+  plot_based_df <- input_df |> 
+    arrange(county_id, year) |> 
+    mutate(
+      ln_total = log(!!var_y),
+      lag_ln_total = dplyr::lag(log(!!var_y), n = lag_i),
+      ln_change_rate_total = log(!!var_y) - dplyr::lag(log(!!var_y), n = lag_i),
+      # ln_total = log(net_internal),
+      # lag_ln_total = dplyr::lag(log(net_internal)),
+      # ln_change_rate_total = log(net_internal) - dplyr::lag(log(net_internal)),
+      .by = county_id
+    ) |>  
+    mutate(ln_change_rate_total = Winsorize(ln_change_rate_total, val = quantile(ln_change_rate_total, probs = c(0.01, 0.99), na.rm = TRUE)), .by = year)  |> 
+    # dplyr::filter(!total < 100) |>
+    dplyr::slice_max(prop = cutoff, order_by = total, by = "year")
+}
+```
+
+```{r}
+create_scatter <-  function(input_df, var_x, cutoff = 1, lag_i = 1){
+
+  var_x <- enquo(var_x)
+
+  output_plot <- ggplot(input_df,
+                       aes(x = !!var_x, y = ln_change_rate_total)) +
+    geom_point(alpha = 0.5, colour = "#333333",
+               fill = "#333333") +
+    theme_bw(base_family = "HiraKakuPro-W3") +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 22),
+      strip.text.x = element_text(size = 20)
+      ) +
+    geom_hline(yintercept = 0,
+               linewidth = 0.6,
+               colour = "black",
+               linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ year,
+               scales = "free") 
+    # scale_x_continuous(breaks = c(5, 10)) +
+    # scale_y_continuous(
+    #   breaks = c(-2, -1, 0, 1, 2),
+    #   limits = c(-2, 2)
+    # )
+  
+  return(output_plot)
+}
+```
+
+```{r}
+create_lm <- function(df_input, var_y, var_x) {
+
+  df <- df_input
+
+  formula_i <- paste0(var_y, "~", var_x)
+  
+  model_output <- list(
+    "2014" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2014)),
+    "2015" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2015)),
+    "2016" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2016)),
+    "2017" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2017)),
+    "2018" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2018)),
+    "2019" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2019)),
+    "2020" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2020)),
+    "2021" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2021)),
+    "2022" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2022))
+    # "2023" = lm_robust(formula = as.formula(formula_i), 
+    #                     data = dplyr::filter(df, year == 2023))
+    )
+  return(model_output)
+}
+
+create_model_summary <- function (model_input, title_n) {
+  
+  gm <- tibble(
+    raw = c("nobs", "r.squared", "adj.r.squared"),
+    clean = c("N", "R2", "R2 adj"),
+    fmt = c(0, 3, 3)
+  )
+  
+  model_based <- modelsummary::msummary(model_input, fmt = "%.4f", 
+                                        estimate =  "{estimate}{stars}",
+                                        stars = c('*' = .1, '**' = .05, '***' = .01),
+                                        coef_rename = c("ln_lag_total" = "β1"),
+                                        gof_map = gm,
+                                        gof_omit = 'AIC|BIC|RMSE',
+                                        # output = "data.frame")
+                                        output = "html")
+  
+  results_model <- model_based 
+  
+  return(results_model)
+  
+}
+```
+
+```{r}
+df_jp <- select_cols_jp(df_jp_raw)
+df_de <- select_cols_de(df_de_raw)
+
+df_jp_native <- select_cols_jp(df_jp_native_raw)
+```
+
+
+```{r}
+df_analysis <- df_de |>
+  create_scatter_df(total) |>  
+  dplyr::filter(year == 2019)
+
+df_analysis_a <- df_de |>
+  create_scatter_df(total) |> 
+  dplyr::filter(year == 2019)
+
+mean_de <- mean(df_analysis$ln_change_rate_total, na.rm = TRUE)
+sd_de <- sd(df_analysis$ln_change_rate_total, na.rm = TRUE)
+```
+
+
+```{r}
+create_scatter_df <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
+
+  var_y <- enquo(var_y)
+  
+  plot_based_df <- input_df |> 
+    arrange(county_id, year) |> 
+    mutate(
+      ln_total = log(!!var_y),
+      lag_ln_total = dplyr::lag(log(!!var_y), n = lag_i),
+      ln_change_rate_total = log(!!var_y) - dplyr::lag(log(!!var_y), n = lag_i),
+      # ln_total = log(net_internal),
+      # lag_ln_total = dplyr::lag(log(net_internal)),
+      # ln_change_rate_total = log(net_internal) - dplyr::lag(log(net_internal)),
+      .by = county_id
+    ) |>  
+    # mutate(ln_change_rate_total = Winsorize(ln_change_rate_total, val = quantile(ln_change_rate_total, probs = c(0.01, 0.99), na.rm = TRUE)), .by = year)  |> 
+    # dplyr::filter(!total < 100) |>
+    dplyr::slice_max(prop = cutoff, order_by = total, by = "year")
+}
+```
+
+
+## Urban
+
+```{r}
+df_cor <- readxl::read_xlsx(here::here('01_data', 'intermediate', 'german', "nuts_correspondence.xlsx")) |>
+    select(county_id, nuts_code3)
+
+df_geo_de <- read_sf(here::here(
+  '01_data', 'raw', 'mapping', 'NUTS250_N3.shp')) |>
+  dplyr::filter(GF == 4) |>
+  select(NUTS_CODE, geometry) |>
+  distinct()
+```
+
+```{r}
+df_de_total <- read.csv(here("01_data", "intermediate", "german", "total_master.csv"))
+
+df_de_class <- df_de_total |> 
+  rename(total = population) |>
+  left_join(df_de_area, by = "county_id") |> 
+  mutate(density = total / area) |> 
+  dplyr::filter(year == 2019) |>
+  mutate(
+    class = case_when(
+      total >= 500000 ~ "big",
+      (density >= 150) & (total >=100000)  ~ "urban",
+      # density >= 100 ~ "mid",
+      # density < 100 ~ "rural",
+      TRUE ~ "rural"
+    )
+  ) 
+
+```
+
+```{r}
+df_de_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+```
+
+```{r}
+df_de_class |> 
+  left_join(df_cor, by = "county_id") |>
+  left_join(df_geo_de, by = c("nuts_code3" = "NUTS_CODE")) |>
+  st_as_sf() |>
+  ggplot() +
+  geom_sf(aes(fill = class)) +
+  theme_void() +
+    theme(
+      legend.position = "bottom",
+      title = element_text(size = 20),
+    ) 
+```
+
+
+```{r}
+de_prop <- df_de_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+
+prop_big <- de_prop |>
+  dplyr::filter(class == "big") |>
+  pull(prop)
+
+prop_urban <- de_prop |>
+  dplyr::filter(class == "urban") |>
+  pull(prop)
+
+prop_rural <- de_prop |>
+  dplyr::filter(class == "rural") |>
+  pull(prop)
+```
+
+## Japan
+
+- ドイツで分類した年サイズに、分位てんを合わせる
+
+```{r}
+df_jp_total <- read.csv(here("01_data", "intermediate", "population", "both_master.csv"), fileEncoding = "cp932") |> 
+  select_cols_jp() |>
+  dplyr::filter(year == 2019)
+
+jp_quantile <- quantile(df_jp_total$total, probs = c(1 - prop_big, 1 - (prop_urban + prop_big), 1 - prop_rural), na.rm = TRUE)
+
+df_jp_class <- df_jp_total |>  
+  mutate(
+    class = case_when(
+      total >= jp_quantile[1] ~ "big",
+      total >= jp_quantile[2]  ~ "urban",
+      # density >= 100 ~ "mid",
+      # density < 100 ~ "rural",
+      TRUE ~ "rural"
+    )
+  ) 
+
+df_jp_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+```
+
+```{r}
+df_de_class |> 
+  left_join(df_cor, by = "county_id") |>
+  left_join(df_geo_de, by = c("nuts_code3" = "NUTS_CODE")) |>
+  st_as_sf() |>
+  ggplot() +
+  geom_sf(aes(fill = class)) +
+  theme_void() +
+    theme(
+      legend.position = "bottom",
+      title = element_text(size = 20),
+    ) 
+```
+
+
+# Internal/International Migration Analysis
+
+## Proportion of cities
+
+### Germany
+```{r}
+df_de_total <- read.csv(here("01_data", "intermediate", "german", "total_master.csv"))
+
+# Area data
+df_de_area <- readxl::read_xlsx(here("01_data", "raw", "german", "area",  "area.xlsx")) |>
+  select(
+    county_id = 1,
+    area = 3
+  ) |>
+  mutate(across(c(area, county_id), as.numeric)) |>
+  dplyr::filter(!is.na(area))
+
+df_de_class <- df_de_total |> 
+  rename(total = population) |>
+  left_join(df_de_area, by = "county_id") |> 
+  mutate(density = total / area) |> 
+  dplyr::filter(year == 2019) |>
+  mutate(
+    class = case_when(
+      total >= 500000 ~ "big",
+      (density >= 150) & (total >=100000)  ~ "urban",
+      # density >= 100 ~ "mid",
+      # density < 100 ~ "rural",
+      TRUE ~ "rural"
+    )
+  ) 
+```
+
+```{r}
+df_de_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+```
+
+```{r}
+df_jp_total <- read.csv(here("01_data", "intermediate", "population", "both_master.csv"), fileEncoding = "cp932") |> 
+  select_cols_jp() 
+
+list_jp_total <- df_jp_total |>
+  dplyr::filter(year == 2019) |>
+  select(total) |>
+  pull()
+
+q_jp <- quantile(list_jp_total, probs = c(0.4961637, 0.4961637 + 0.4526854), na.rm = TRUE)
+
+df_jp_class <- df_jp_total |>
+  dplyr::filter(year == 2019) |>
+  mutate(
+    class = case_when(
+      total >= q_jp[2] ~ "big",
+      total <= q_jp[1] ~ "rural",
+      # density >= 100 ~ "mid",
+      # density < 100 ~ "rural",
+      TRUE ~ "urban"
+    )
+  )
+```
+
+### Japan
+
+```{r}
+df_jp_class |>
+  summarise(n = n(), .by = class) |>
+  mutate(prop = n / sum(n))
+
+
+log(200) * 144.497 - log(100) * 144.497
+log(200) * 0.808 - log(100) * 0.808
+
+log(200)
+log(100) + log(2)
+```
+
+
+## International Share
+
+- 移動してくる人口の国際/国内移動の割合を観察する。
+
+国際移動比率
+  国際流入 / (国際流入 + 国内流入)
+
+
+国際移民比率が都心の方が高い場合は、ゲートウェイシティとしての役割がある可能性がある。
+
+### By city size
+
+#### Germany
+```{r}
+df_de |>
+  left_join(df_de_class |> select(county_id, class), by = "county_id") |> 
+  mutate(
+    share_international = add_external / add
+  ) |>
+  summarise(
+    mean = mean(share_international, na.rm = TRUE),
+    sd = sd(share_international, na.rm = TRUE),
+    .by = c(class, year)
+    # .by = class
+  ) |>
+  arrange(class, year) |>
+  ggplot(aes(x = year, y = mean, color = class)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+  limits = c(0.3, 1)) 
+```
+
+
+#### Japan
+
+大都市は国際移動比率が高い。しかし、地方部は分散が大きく、高い地域と低い地域がある可能性。対数変率も奥義型で、決まった傾向がない可能性
+
+```{r}
+df_jp |>
+  left_join(df_jp_class |> select(county_id, class), by = "county_id") |> 
+  mutate(
+    share_international = add_external / add
+  ) |>
+  summarise(
+    mean = mean(share_international, na.rm = TRUE),
+    sd = sd(share_international, na.rm = TRUE),
+    .by = c(class, year)
+    # .by = class
+  ) |>
+  arrange(class, year) |>
+    ggplot(aes(x = year, y = mean, color = class)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+  limits = c(0.3, 1)) 
+```
+
+
+### Within rural positive area
+
+2013 - 2019年の間に、人口が増加した地域のみを抽出する。
+
+$$
+log(2019) - log(2013) > 0
+$$
+
+```{r}
+filter_rural <- function(df, df_class) {
+  
+  df_output <- df |>
+    left_join(df_class |> select(county_id, class), by = "county_id") |>
+    arrange(county_id, year) |> 
+      mutate(
+        ln_total = log(total),
+        lag_ln_total = dplyr::lag(log(total), n = 6),
+        ln_change_rate_total = log(total) - dplyr::lag(log(total), n = 6),
+        # ln_total = log(net_internal),
+        # lag_ln_total = dplyr::lag(log(net_internal)),
+        # ln_change_rate_total = log(net_internal) - dplyr::lag(log(net_internal)),
+        .by = county_id
+      ) |> 
+      dplyr::filter(
+        year == 2019, 
+        class == "rural"
+      )
+}
+```
+
+
+```{r}
+df_jp_rural_positive <- filter_rural(df_jp, df_jp_class) |>
+  dplyr::filter(ln_change_rate_total > 0)
+
+```
+
+germany
+
+```{r}
+df_de_rural_positive <- filter_rural(df_jp, df_de_class) |>
+  dplyr::filter(ln_change_rate_total > 0)
+
+```
+japan
+
+```{r}
+df_jp_rural_negative <- filter_rural(df_jp, df_jp_class) |>
+  dplyr::filter(ln_change_rate_total < 0)
+```
+
+```{r}
+df_jp_rural_positive |> 
+  mutate(
+    share_international = add_external / add
+  ) |>
+  summarise(
+    mean = mean(share_international, na.rm = TRUE),
+    sd = sd(share_international, na.rm = TRUE),
+    .by = class
+  )
+
+df_jp_rural_negative |> 
+  mutate(
+    share_international = add_external / add
+  ) |>
+  summarise(
+    mean = mean(share_international, na.rm = TRUE),
+    sd = sd(share_international, na.rm = TRUE),
+    .by = class
+  )
+```
+
+
+```{r}
+df_de_rural_positive |> 
+  mutate(
+    share_international = add_external / add
+  ) |>
+  summarise(
+    mean = mean(share_international, na.rm = TRUE),
+    sd = sd(share_international, na.rm = TRUE),
+    .by = class
+  )
+```
+
+
+```{r}
+native_jp_19 <- df_jp_native |> 
+  create_scatter_df(total, lag_i = 6) |> 
+  dplyr::filter(year == 2019)
+
+native_de_19 <- df_de_native |>
+  create_scatter_df(total, lag_i = 6) |> 
+  dplyr::filter(year == 2019)
+```
+
+
+```{r}
+native_jp_19 |> 
+  create_scatter(lag_ln_total, lag_i = 6)
+native_de_19 |> 
+  create_scatter(lag_ln_total, lag_i = 6)
+```
+
+
+```{r}
+native_jp_19 |>  
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  create_model_summary("Japan")
+  
+native_de_19 |> 
+  create_lm("ln_change_rate_total", 'lag_ln_total') |>
+  create_model_summary("Germany")
+```
+
+
+### Population complement
+
+(native increase + native decrease) - (foreign increase without birth + foreign increase without death) > 0
+
+- 外国人は死亡や出生を含まない。
+- 外国人移動は, 増加 - 出生 - 減少 + 死亡
+  - 厳密な数値は用いない。理由はその他で消える外国人が多く、転出数だけをみると過小になる。これはドイツの統計局も同じ手法を用いており、確認済み。
+
+```{r}
+df_jp_native_change <- df_jp_native |>
+  mutate(native = add - exit) |>
+  select(county_id, county_name, year, native)
+
+df_jp_complement <- df_jp |> 
+  left_join(
+    df_jp_native |> select(county_id, year, native = total),
+    by = join_by(county_id, year)) |> 
+  mutate(
+    native_change = native - dplyr::lag(native),
+    complement = native_change + (add - birth) + (-exit + death),
+    .by = county_id
+  )
+
+
+df_de_complement <- df_de |> 
+  left_join(
+    df_de_native |> select(county_id, year, native = total),
+    by = join_by(county_id, year)) |> 
+  mutate(
+    native_change = native - dplyr::lag(native),
+    complement = native_change + (add - birth) + (-exit + death),
+    .by = county_id
+  )
+```
+
+
+```{r}
+df_jp_complement |>  
+  left_join(df_jp_class |> select(county_id, class), by = "county_id") |> 
+  dplyr::filter(
+    native_change < 0,
+    complement > 0
+    ) |> 
+  summarise(
+    n = n(),
+    .by = c(year, class)
+  ) |>
+  arrange(year, class)
+```
+
+
+```{r}
+df_de_complement |>  
+  dplyr::filter(
+    native_change < 0,
+    complement > 0
+    ) |> 
+  summarise(
+    n = n(),
+    .by = year
+  ) |>
+  arrange(year)
+```
+
+
+
+# Line chart 2013 base
+
+```{r}
+select_cols_jp <- function(df_jp) {
+
+  df_output <- df_jp |>
+    select(
+      county_id = city_id, county_name = city_name, prefecture_name, year, total,
+      add = moving_in_total,
+      add_internal = moving_in_dom,
+      add_external = moving_in_int,
+      add_birth = birth,
+      exit = moving_out_total,
+      exit_internal = moving_out_dom,
+      exit_external = moving_out_int,
+      exit_death = mortality
+    )
+}
+
+add_growth_rate <- function(df_i, column_i, list_var_order) {
+
+  df_output <- df_i |>
+    arrange(!!! rlang::syms(list_var_order)) |>
+    # arrange(is_urban,region, year) |> View()
+    mutate(
+      base_13 = ifelse(year == 2013, !!sym(column_i), NA)
+      ) |> 
+    fill(base_13, .direction = "down") |>
+    mutate(
+      growth_rate = round((!!sym(column_i) / base_13)*100, digits = 3)
+    ) |>
+    select(-base_13)
+
+}
+
+
+generate_df_plot <- function(df, df_native, list_var_order) {
+
+  df_sum <- df |>
+    summarise(
+      total = sum(total, na.rm = TRUE),
+      .by = year
+    ) |> 
+    add_growth_rate("total", list_var_order) 
+
+  df_sum_native <- df_native |>
+    summarise(
+      total = sum(total_native, na.rm = TRUE),
+      .by = year
+    ) |>
+    add_growth_rate("total", list_var_order) |>
+    rename(
+      growth_rate_native = growth_rate,
+      total_native = total) 
+
+
+  df_plot <- df_sum |>
+    left_join(df_sum_native) |> 
+    select(-starts_with("total")) |> 
+    pivot_longer(
+      cols = -c(year),
+      names_to = "country",
+      values_to = "value"
+    )
+
+
+}
+
+
+plot_line_chart <- function(df_plot, var_color) {
+
+  var_color <- enquo(var_color)
+
+  plot_output <- df_plot |>
+    ggplot(aes(x = year, y = value, color = !!var_color)) + 
+    geom_point() +
+    geom_line() +
+    theme_bw() +
+    scale_x_continuous(
+      breaks = seq(2013, 2019, 1),
+      limits = c(2013, 2019)
+      )
+
+  return(plot_output)
+}
+
+
+plot_line_chart_urban <- function(df_pref_urban, var_color) {
+
+  var_color <- enquo(var_color)
+
+  plot_output <- df_pref_urban |>
+    ggplot(aes(x = year, y = value, color = region)) + 
+    # ggplot(aes(x = year, y = value, color = !!var_color)) + 
+    geom_point() +
+    geom_line() +
+    theme_bw() +
+    scale_x_continuous(
+      breaks = seq(2013, 2019, 1),
+      limits = c(2013, 2019)
+      ) +
+    facet_wrap(~is_urban)
+
+  return(plot_output)
+}
+
+```
+
+
+### Japan
+
+```{r}
+# Plot
+df_plot <- generate_df_plot(df = df_jp_raw, df_jp_native |> select(total_native = total, year, county_id), list_var_order = NULL)
+plot_line_chart(df_plot, country)
+```
+
+### Germany
+
+```{r}
+df_plot <- generate_df_plot(df = df_de_raw, df_de_native |> select(total_native = total, year, county_id), list_var_order = NULL)
+plot_line_chart(df_plot, country)
+```
+
+```{r}
+# Plot by Region
+## By country
+df_pref_region <- read_xlsx(here("01_data", "intermediate", "foreign_status", "prefecture_by_region.xlsx"))
+
+df_region <- df_pref_region |>
+  summarise(
+    total = sum(population, na.rm = TRUE),
+    .by = c(year, region)
+  ) |>
+  add_growth_rate("total", list_var_order = c("region", "year")) |>
+  rename(value = growth_rate) 
+
+plot_line_chart(df_region, region)
+```
+
+
+```{r}
+df_de_region <- read_xlsx(here("01_data", "intermediate", "german", "population_region.xlsx")) |>
+  dplyr::filter(
+    between(year, 2013, 2019),
+    region != "Total" 
+    ) |>  
+    mutate(
+      population = as.numeric(population)
+    ) |> 
+  summarise(
+    total = sum(population, na.rm = TRUE),
+    .by = c(year, region)
+  ) |>
+  add_growth_rate("total", list_var_order = c("region", "year")) |> 
+  rename(value = growth_rate) 
+```
+
+```{r}
+plot_line_chart(df_de_region, region)
+```
+
+```{r}
+# By Urban and Rural
+list_urban_pref <- c("東京", "神奈川", "埼玉", "千葉", "大阪", "愛知")
+
+df_pref_urban <- df_pref_region |> 
+  mutate(is_urban = ifelse(prefecture %in% list_urban_pref, "Urban", "Rural")) |> 
+  summarise(
+    total = sum(population, na.rm = TRUE),
+    .by = c(year, is_urban, region)
+  ) |>
+  add_growth_rate("total", list_var_order = c("is_urban", "region", "year")) |> 
+  rename(value = growth_rate)
+```
+
+```{r}
+df_de_county_region <- read_xlsx(here("01_data", "intermediate", "german", "population_region.xlsx")) |>  
+  dplyr::filter(
+    between(year, 2013, 2019),
+    region != "Total" 
+    ) |> 
+  left_join(df_de_class |> select(county_id, class), by = "county_id") |>  
+  dplyr::filter(is.na(class)) |> 
+  summarise(
+    total = sum(population, na.rm = TRUE),
+    .by = c(year, class, region)
+  ) |>
+  add_growth_rate("total", list_var_order = c("class", "region", "year")) |> 
+  rename(value = growth_rate)
+```

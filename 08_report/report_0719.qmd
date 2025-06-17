@@ -1,0 +1,445 @@
+---
+title: "report_0621"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+    fig-width: 10
+    fig-height: 10
+
+execute:
+  echo: false
+  
+---
+
+#  
+
+```{r}
+#| label: setup
+
+pacman::p_load(
+    here,
+    dplyr,
+    ggplot2,
+    janitor,
+    tidyr,
+    gt,
+    gtExtras,
+    estimatr,
+    modelsummary
+)
+```
+
+# Germany
+
+
+```{r}
+
+df_raw <- readxl::read_xlsx(here::here("01_data", "raw", "german", "12521-0040-KREISE_$F.xlsx"))
+
+```
+
+
+```{r}
+
+clean_german <- function(df) {
+
+    df_german <- df_raw |>
+        dplyr::select(
+            municipality_id = 1,
+            municipality_name = 2,
+            population = 5
+        ) |>
+    dplyr::mutate(
+        year = if_else(
+            stringr::str_detect(municipality_id, "31.12"),
+            stringr::str_sub(municipality_id, start = -4, end = -1), 
+            NA
+        )) |> 
+    tidyr::fill(year, .direction = "down") |>
+    mutate(
+        year = as.numeric(year),
+        population = as.numeric(population)
+    ) |>
+    dplyr::filter(
+        between(year, 2012, 2023)
+    )
+    # tidyr::drop_na()
+
+    return(df_german)
+}
+
+df_german <- clean_german(df_raw) |>
+    dplyr::filter(year >= 2014) |>
+    tidyr::drop_na()
+```
+
+
+```{r}
+
+df_german_analysis <- df_german |>
+    dplyr::arrange(municipality_id, year) |> 
+    dplyr::group_by(municipality_id) |>
+    dplyr::mutate(
+      ln_total = log(population),
+      lag_ln_total = dplyr::lag(ln_total),
+      ln_change_rate_total = ln_total - lag_ln_total
+    )
+```
+
+
+```{r}
+create_lm <- function(df_input) {
+  
+  model_output <- list(
+    "2014" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2014)),
+    "2015" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2015)),
+    "2016" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2016)),
+    "2017" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2017)),
+    "2018" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2018)),
+    "2019" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2019)),
+    "2020" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2020)),
+    "2021" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2021)), 
+    "2022" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2022)), 
+    "2023" = estimatr::lm_robust(formula = ln_change_rate_total ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2023))
+    )
+  
+  return(model_output)
+  
+}
+
+
+
+create_model_summary <- function (model_input, title_n) {
+  
+  gm <- tibble(
+    raw = c("nobs", "r.squared", "adj.r.squared"),
+    clean = c("N", "R2", "R2 adj"),
+    fmt = c(0, 3, 3)
+  )
+  
+  model_based <- modelsummary::msummary(model_input, fmt = "%.4f", 
+                                        estimate =  "{estimate}{stars}",
+                                        stars = c('*' = .1, '**' = .05, '***' = .01),
+                                        coef_rename = c("ln_lag_total" = "β1"),
+                                        gof_map = gm,
+                                        gof_omit = 'AIC|BIC|RMSE',
+                                        output = "data.frame")
+  
+  results_model <- model_based |>
+    dplyr::filter(
+        term != "(Intercept)"
+    )
+  
+  return(results_model)
+  
+}
+
+
+
+```
+
+
+
+```{r}
+
+model_german <- create_lm(df_german_analysis)
+create_model_summary(model_german) |> gt()
+
+```
+
+
+
+
+```{r}
+
+create_scatter <-  function(input_df,
+                            title_x){
+  
+  plot_based_df <- input_df |> 
+    dplyr::filter(!year %in% c(2013, 2014))
+  
+  output_plot <- ggplot(plot_based_df,
+                       aes(x = lag_ln_total, y = ln_change_rate_total)) +
+    geom_point(alpha = 0.5, colour = "#333333",
+               fill = "#333333") +
+    theme_bw(base_family = "HiraKakuPro-W3") +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 22),
+      strip.text.x = element_text(size = 20)
+      ) +
+    labs(
+      x = title_x,
+      y = "対数変化率（ln）") +
+    geom_hline(yintercept = 0,
+               linewidth = 0.6,
+               colour = "black",
+               linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ year,
+               scales = "free") +
+    scale_x_continuous(
+      breaks = scales::pretty_breaks(n = 3)) 
+    # scale_y_continuous(
+    #   breaks = c(-2, -1, 0, 1, 2),
+    #   limits = c(-2, 2)
+    # )
+  
+  return(output_plot)
+}
+
+```
+
+
+
+```{r}
+create_scatter(df_german_analysis, title_x = "対数人口（ln）")
+```
+
+
+
+```{r}
+df_pop_german <- read.csv(here::here("01_data", "raw", "german", "population.csv"))
+df_register <- read.csv(here::here("01_data", "intermediate", "german", "temp_0719.csv"))
+```
+
+
+```{r}
+df_plot <- df_pop_german |>
+  summarise(
+    total_pop = sum(total_value),
+    .by = c(date)
+  ) 
+
+ggplot2::ggplot(df_plot, aes(x = date, y = total_pop)) +
+  ggplot2::geom_bar(stat = "identity") 
+
+```
+
+```{r}
+
+
+ggplot(df_register,
+  aes(x = lag_ln_total, y = social_rate)) +
+  geom_point(alpha = 0.5, colour = "#333333",
+              fill = "#333333") +
+  theme_bw(base_family = "HiraKakuPro-W3") +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 22),
+      strip.text.x = element_text(size = 20)
+    ) +
+  #   labs(
+  #     x = title_x,
+  #     y = "社会増減率") +
+    geom_hline(yintercept = 0,
+                linewidth = 0.6,
+                colour = "black",
+                linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ year,
+                scales = "free") 
+    # scale_x_continuous(breaks = c(5, 10)) +
+    # scale_y_continuous(limits = c(-50, 50))
+
+
+```
+
+
+```{r}
+ggplot(df_register,
+  aes(x = lag_ln_total, y = social_rate)) +
+  geom_point(alpha = 0.5, colour = "#333333",
+              fill = "#333333") +
+  theme_bw(base_family = "HiraKakuPro-W3") +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 22),
+      strip.text.x = element_text(size = 20)
+    ) +
+  #   labs(
+  #     x = title_x,
+  #     y = "社会増減率") +
+    geom_hline(yintercept = 0,
+                linewidth = 0.6,
+                colour = "black",
+                linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ year,
+                scales = "free") +
+    scale_y_continuous(limits = c(-100, 200))
+```
+
+```{r}
+#| eval: false
+
+ggplot(df_register,
+  aes(x = lag_ln_total, y = log(social))) +
+  geom_point(alpha = 0.5, colour = "#333333",
+              fill = "#333333") +
+  theme_bw(base_family = "HiraKakuPro-W3") +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 20),
+      axis.text.y = element_text(size = 20),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 22),
+      strip.text.x = element_text(size = 20)
+    ) +
+  #   labs(
+  #     x = title_x,
+  #     y = "社会増減率") +
+    geom_hline(yintercept = 0,
+                linewidth = 0.6,
+                colour = "black",
+                linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ year,
+                scales = "free") 
+    # scale_y_continuous(limits = c(-100, 200))
+
+
+```
+
+
+
+
+
+```{r}
+
+create_lm <- function(df_input) {
+  
+  model_output <- list(
+    "2014" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2014)),
+    "2015" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2015)),
+    "2016" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2016)),
+    "2017" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2017)),
+    "2018" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2018)),
+    "2019" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2019)),
+    "2020" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2020)),
+    "2021" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2021)), 
+    "2022" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2022)), 
+    "2023" = estimatr::lm_robust(formula = social_rate ~  lag_ln_total, 
+                       data = dplyr::filter(df_input, year == 2023))
+    )
+  
+  return(model_output)
+  
+}
+
+
+
+create_model_summary <- function (model_input, title_n) {
+  
+  gm <- tibble(
+    raw = c("nobs", "r.squared", "adj.r.squared"),
+    clean = c("N", "R2", "R2 adj"),
+    fmt = c(0, 3, 3)
+  )
+  
+  model_based <- modelsummary::msummary(model_input, fmt = "%.4f", 
+                                        estimate =  "{estimate}{stars}",
+                                        stars = c('*' = .1, '**' = .05, '***' = .01),
+                                        coef_rename = c("ln_lag_tot" = "β1"),
+                                        gof_map = gm,
+                                        gof_omit = 'AIC|BIC|RMSE',
+                                        output = "data.frame")
+  
+  results_model <- model_based |>
+    dplyr::filter(
+        term != "(Intercept)"
+    )
+  
+  return(results_model)
+  
+}
+
+```
+
+
+
+```{r}
+model_german <- create_lm(df_register)
+create_model_summary(model_german) |> gt()
+```

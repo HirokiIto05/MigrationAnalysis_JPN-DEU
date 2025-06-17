@@ -1,0 +1,741 @@
+---
+title: "1299 report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+  
+---
+
+
+#### memo
+ドイツ：永住者とそれ以外で比較
+
+
+#### Basic Infomation
+- 2013 - 2023年
+- 15 - 64歳の人口/割合
+  - 25 - 64歳も取得可能
+
+- 38地域
+- Education Attainment Categories
+  1. educat 1
+    - Less than primary, primary and lower secondary education (educats 0-2)
+  2. educat 2
+    - Upper secondary and post-secondary non-tertiary education (educats 3 and 4)
+      - 高校相当
+  3. educat 3
+    - Tertiary education (educats 5-8)
+      - 大学卒業以上
+
+```{r}
+#| label: read data
+df_raw <- readxl::read_xlsx(here("01_data", "intermediate", "german", "master_nuts2.xlsx"))
+```
+
+```{r}
+complement_percent <- function(df_master, detect_words, var_educat_1, var_educat_2, var_educat_3) {
+
+  var_educat_1 <- enquo(var_educat_1)
+  var_educat_2 <- enquo(var_educat_2)
+  var_educat_3 <- enquo(var_educat_3)
+  
+  df_complement <- df_master |>
+    select(
+      year, 
+      city_name, 
+      starts_with(detect_words)) |>
+    mutate(
+      !!sym(paste0(detect_words, "_", "educat_1")) := if_else(is.na(!!var_educat_1), 1 - !!var_educat_2 - !!var_educat_3, !!var_educat_1),
+      !!sym(paste0(detect_words, "_", "educat_2")) := if_else(is.na(!!var_educat_2), 1 - !!var_educat_1 - !!var_educat_3, !!var_educat_2),
+      !!sym(paste0(detect_words, "_", "educat_3")) := if_else(is.na(!!var_educat_3), 1 - !!var_educat_1 - !!var_educat_2, !!var_educat_3)
+    ) 
+}
+
+merge_complement <- function(df_master) {
+
+  df_eu_comp <- complement_percent(df_master, "eu", eu_educat_1,eu_educat_2,eu_educat_3) 
+  df_non_eu_comp <- complement_percent(df_master, "non_eu", non_eu_educat_1,non_eu_educat_2,non_eu_educat_3)
+
+  df_output <- df_master |>
+    select(-starts_with("eu"), -starts_with("non_eu")) |>
+    left_join(df_eu_comp, by = c("city_name", "year")) |>
+    left_join(df_non_eu_comp, by = c("city_name", "year"))
+    
+}
+
+check_na_eu <- function(df, cat_eu) {
+
+  df_output <- df |>
+    select(
+      year,
+      city_name,
+      starts_with(cat_eu),
+    ) %>%
+    dplyr::filter(
+      between(year, 2013, 2019),
+      if_any(starts_with(cat_eu), is.na)
+      )
+}
+```
+
+```{r}
+df_master <- merge_complement(df_raw)
+
+
+
+df_na_eu <- check_na_eu(df_master, "eu")
+df_na_non_eu <- check_na_eu(df_master, "non_eu")
+
+list_remove_city_eu <- df_na_eu |> 
+  distinct(city_name) |>
+  pull()
+
+list_remove_city_non_eu <- df_na_non_eu |> 
+  distinct(city_name) |>
+  pull()
+
+
+df_analysis <- df_master |>
+  dplyr::filter(
+    !city_name %in% list_remove_city_eu,
+    !city_name %in% list_remove_city_non_eu
+  )
+```
+
+# Descriptive statistics
+
+## Total
+
+```{r}
+summarise_eu_cat <- function(df_master, eu_cat, var_eu) {
+
+  df <- df_master |>  
+    select(
+      year, 
+      city_name, 
+      starts_with(var_eu)
+      ) |> 
+    summarise(
+      educat_1 = mean(!!sym(paste0(var_eu, "_1")), na.rm = TRUE),
+      educat_2 = mean(!!sym(paste0(var_eu, "_2")), na.rm = TRUE),
+      educat_3 = mean(!!sym(paste0(var_eu, "_3")), na.rm = TRUE),
+      .by = c(city_name)
+      ) |>  
+    pivot_longer(
+      cols = -c(city_name), 
+      names_to = "educat", 
+      values_to = "value") |>
+    left_join(df_master |> dplyr::filter(year == 2019) |> select(city_name, total), by = c("city_name")) |>
+    mutate(
+      category = eu_cat
+    )
+}
+
+create_pct_bar <- function(df, eu_cat) {
+  plot <- df |>
+    ggplot(aes(x = reorder(city_name, total), y = value)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      coord_flip() +
+      facet_wrap(~educat) +
+    scale_y_continuous(
+      breaks = seq(0, 0.6, 0.1),
+      limits = c(0,0.65)
+    ) +
+    labs(
+      title = paste0("Education educat :", eu_cat),
+      x = "City",
+      y = "Average share"
+    ) +
+    theme_bw() +
+    theme(
+      strip.background = element_blank(),
+      strip.text = element_text(size = 14),
+      axis.text.y = element_text(size = 14),
+      # axis.text.x = element_text(size = 14),
+      # axis.text.x = element_blank()
+    )
+  plot
+}
+```
+```{r}
+df_bar_total <- summarise_eu_cat(df_master, "total", "educat") 
+```
+
+### Summary education category
+```{r results='asis'}
+df_bar_total |>
+  summarise(
+    mean = mean(value, na.rm = TRUE),
+    max = max(value, na.rm = TRUE),
+    min = min(value, na.rm = TRUE),
+    .by = (educat)
+  ) |>
+  mutate(
+    across(-c(educat), ~round(., 2))
+  ) |>
+  gt()
+```
+
+```{r}
+
+df_plot_education_cat <- df_master |>  
+    select(
+      year, 
+      city_name, 
+      starts_with("educat")
+      ) |>  
+    summarise(
+      educat_1 = mean(!!sym(paste0("educat", "_1")), na.rm = TRUE),
+      # educat_1_max = max(!!sym(paste0("educat", "_1")), na.rm = TRUE),
+      # educat_1_min = min(!!sym(paste0("educat", "_1")), na.rm = TRUE),
+      educat_2 = mean(!!sym(paste0("educat", "_2")), na.rm = TRUE),
+      # educat_2_max = max(!!sym(paste0("educat", "_2")), na.rm = TRUE),
+      # educat_2_min = min(!!sym(paste0("educat", "_2")), na.rm = TRUE),
+      educat_3 = mean(!!sym(paste0("educat", "_3")), na.rm = TRUE),
+      # educat_3_max = max(!!sym(paste0("educat", "_3")), na.rm = TRUE),
+      # educat_3_min = min(!!sym(paste0("educat", "_3")), na.rm = TRUE),
+      .by = c(year)
+      )  |>
+      pivot_longer(
+        cols = -c(year), 
+        names_to = "educat", 
+        values_to = "value")
+```
+
+### Time series
+
+nativeも分析する
+```{r}
+df_plot_education_cat |>
+  ggplot(aes(x = year, y = value, color = educat)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  labs(
+    title = "Education educat",
+    x = "Year",
+    y = "Average share"
+  ) +
+  theme(
+    legend.position = "bottom"
+  )
+```
+
+### Bar plot by city and education category
+- y軸は外国人の総人口が高い -> 低い
+- 外国人人口が少ない地域の方が、やや学歴が高い傾向にある
+
+```{r}
+#| fig-height: 8
+#| fig-width: 12
+df_bar_total |>
+  ggplot(aes(x = reorder(city_name, total), y = value)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  coord_flip() +
+  facet_wrap(~educat) +
+  scale_y_continuous(
+    breaks = scales::pretty_breaks(n = 5)
+  ) +
+  labs(
+    title = "Education educat",
+    x = "City",
+    y = "Average share"
+  ) +
+  theme_bw() +
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+    axis.text.x = element_text(size = 14),
+    axis.title.y = element_blank()
+  )
+```
+
+## EU & non_EU compare
+
+- 全ての年で欠損がない都市の分析(29/38地域)
+- 2013 - 2019年
+  - EUROSTATによると、2020年以降はデータの"bu	break in time series, low reliability"が多く信頼性に欠けるため。
+
+```{r}
+df_bar_eu <- summarise_eu_cat(df_analysis, "eu", "eu_educat") 
+df_bar_non_eu <- summarise_eu_cat(df_analysis, "non_eu", "non_eu_educat") 
+```
+
+```{r}
+bar_eu <- create_pct_bar(df_bar_eu, "EU")
+bar_non_eu <- create_pct_bar(df_bar_non_eu, "non-EU")
+```
+
+```{r}
+#| fig-height: 10
+#| fig-width: 12
+create_pct_bar(df_bar_eu, "EU") + create_pct_bar(df_bar_non_eu, "non-EU") +
+  plot_layout(ncol = 1, guides = "collect") &
+  theme(
+    # title = element_blank(),
+    # axis.text.y = element_blank()
+    axis.title.y = element_blank(),
+    axis.text.y = element_text(size = 12)
+    )
+
+```
+
+
+# Gibrat's law
+
+```{r}
+create_lm <- function(df_input, var_y, var_x, is_nuts = TRUE) {
+
+  if(is_nuts == FALSE) {
+    df_outlier <- quantile(
+      df_input |> pull(!!sym(var_y)), 
+      probs = c(0.01, 0.99),
+      na.rm = TRUE) 
+
+    q_1 <- df_outlier[1]
+    q_99 <- df_outlier[2]
+
+    df <- df_input |>
+      dplyr::filter(between(!!sym(var_y), q_1, q_99))
+  } else {
+    df <- df_input
+  }
+
+
+  formula_i <- paste0(var_y, "~", var_x)
+  
+  model_output <- list(
+    "2014" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2014)),
+    "2015" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2015)),
+    "2016" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2016)),
+    "2017" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2017)),
+    "2018" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2018)),
+    "2019" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2019)),
+    "2020" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2020)),
+    "2021" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2021)),
+    "2022" = lm_robust(formula = as.formula(formula_i), 
+                       data = dplyr::filter(df, year == 2022)),
+    "2023" = lm_robust(formula = as.formula(formula_i), 
+                        data = dplyr::filter(df, year == 2023))
+    )
+  return(model_output)
+}
+
+create_model_summary <- function (model_input, title_n) {
+  
+  gm <- tibble(
+    raw = c("nobs", "r.squared", "adj.r.squared"),
+    clean = c("N", "R2", "R2 adj"),
+    fmt = c(0, 3, 3)
+  )
+  
+  model_based <- modelsummary::msummary(model_input, fmt = "%.4f", 
+                                        estimate =  "{estimate}{stars}",
+                                        stars = c('*' = .1, '**' = .05, '***' = .01),
+                                        coef_rename = c("ln_lag_total" = "β1"),
+                                        gof_map = gm,
+                                        gof_omit = 'AIC|BIC|RMSE',
+                                        # output = "data.frame")
+                                        output = "html")
+  
+  results_model <- model_based 
+  
+  return(results_model)
+  
+}
+```
+
+```{r}
+#| fig-height: 10
+#| fig-width: 12
+
+plot_gibrats_law <- function(df, is_nuts = FALSE) {
+
+  if(is_nuts == FALSE) {
+    df_outlier <- quantile(
+      df$ln_change_total, 
+      probs = c(0.01, 0.99),
+      na.rm = TRUE) 
+
+    q_1 <- df_outlier[1]
+    q_99 <- df_outlier[2]
+
+    df_plot <- df |>
+      dplyr::filter(between(ln_change_total, q_1, q_99))
+  } else {
+    df_plot <- df
+  }
+
+
+  plot_output <- df_plot |>
+    ggplot(aes(x = ln_initial, y = ln_change_total)) +
+    geom_point(alpha = 0.5, colour = "#333333",
+              fill = "#333333") +
+    geom_hline(yintercept = 0,
+              linewidth = 0.6,
+              colour = "black",
+              linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    theme_bw() +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 16),
+      axis.text.y = element_text(size = 16),
+      axis.title.x = element_text(size = 19),
+      axis.title.y = element_text(size = 19),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 16),
+      ) +
+    labs(
+      title = "Gibrat's law",
+      x = "Initial size (log)",
+      y = "Growth rate (log)"
+    ) +
+    facet_wrap(
+      ~ year, 
+      scales = "fixed",
+      ncol = 3)
+
+  plot_output
+}
+```
+
+## Native population
+### Nuts2
+```{r}
+df_gib_native <- df_master |>
+  select(
+    year, 
+    city_name, 
+    native_total
+    ) |>
+  arrange(city_name, year) |>  
+  mutate(
+    ln_initial = dplyr::lag(log(native_total)),
+    ln_change_total = log(native_total) - dplyr::lag(log(native_total)),
+    .by = city_name
+  ) |> 
+  dplyr::filter(year != min(year))
+```
+
+
+```{r}
+plot_gibrats_law(df_gib_native, is_nuts = FALSE)
+```
+
+```{r}
+estimate_total <- create_lm(df_gib_native, "ln_change_total", "ln_initial")
+create_model_summary(estimate_total, "Total")
+```
+
+
+### Municipalities (400)
+
+```{r}
+df_german_native <- read.csv(here("01_data", "intermediate", "german", "native_master.csv")) |>
+    select(
+    year, 
+    county_name, 
+    native_total = population 
+    ) |>
+  arrange(county_name, year) |>  
+  mutate(
+    ln_initial = dplyr::lag(log(native_total)),
+    ln_change_total = log(native_total) - dplyr::lag(log(native_total)),
+    .by = county_name
+  ) |> 
+  dplyr::filter(year != min(year))
+```
+
+```{r}
+plot_gibrats_law(df_german_native, is_nuts = FALSE)
+```
+
+```{r}
+estimate_total <- create_lm(df_german_native, "ln_change_total", "ln_initial", is_nuts = FALSE)
+create_model_summary(estimate_total, "Total")
+```
+
+## Foreign
+
+### Nuts2
+```{r}
+df_gib_total <- df_master |>
+  select(
+    year, 
+    city_name, 
+    total
+    ) |>
+  arrange(city_name, year) |>  
+  mutate(
+    ln_initial = dplyr::lag(log(total)),
+    ln_change_total = log(total) - dplyr::lag(log(total)),
+    .by = city_name
+  ) |> 
+  dplyr::filter(year != min(year))
+```
+
+```{r}
+#| fig-height: 10
+#| fig-width: 12
+plot_gibrats_law(df_gib_total, is_nuts = FALSE)
+```
+
+```{r}
+estimate_total <- create_lm(df_gib_total, "ln_change_total", "ln_initial", is_nuts = FALSE) 
+create_model_summary(estimate_total, "Total")
+```
+
+### Municipalities (400)
+
+```{r}
+df_german_foreign <- read.csv(here("01_data", "intermediate", "german", "foreign_master.csv")) |> 
+    select(
+    year, 
+    county_name, 
+    foreign_total = total 
+    ) |>
+  arrange(county_name, year) |>  
+  mutate(
+    ln_initial = dplyr::lag(log(foreign_total)),
+    ln_change_total = log(foreign_total) - dplyr::lag(log(foreign_total)),
+    .by = county_name
+  ) |> 
+  dplyr::filter(year != min(year))
+```
+
+```{r}
+plot_gibrats_law(df_german_foreign, is_nuts = FALSE)
+```
+
+```{r}
+estimate_total <- create_lm(df_german_foreign, "ln_change_total", "ln_initial", is_nuts = FALSE)
+create_model_summary(estimate_total, "Total")
+```
+
+### Education Attainment
+
+```{r}
+#| fig-height: 8
+#| fig-width: 12
+df_gib_edu <- df_master |>
+  select(
+    year, 
+    city_name, 
+    total,
+    starts_with("educat"),
+    ) |>
+  mutate(
+    total_educat_1 = educat_1*total,
+    total_educat_2 = educat_2*total,
+    total_educat_3 = educat_3*total
+  ) |>
+  arrange(city_name, year) |>  
+  mutate(
+    initial_educat1 = dplyr::lag(log(total_educat_1)),
+    initial_educat2 = dplyr::lag(log(total_educat_2)),
+    initial_educat3 = dplyr::lag(log(total_educat_3)),
+    ln_change_educat1 = log(total_educat_1) - dplyr::lag(log(total_educat_1)),
+    ln_change_educat2 = log(total_educat_2) - dplyr::lag(log(total_educat_2)),
+    ln_change_educat3 = log(total_educat_3) - dplyr::lag(log(total_educat_3)),
+    .by = city_name
+  ) 
+```
+
+```{r}
+df_plot_gib_edu <- df_gib_edu |>
+  select(
+    year, 
+    city_name, 
+    starts_with("initial"), 
+    starts_with("ln_change_educat")
+  ) |> 
+  dplyr::filter(year != min(year)) |>
+  pivot_longer(
+    cols = c(starts_with("initial")), 
+    names_to = "educat_initial",
+    values_to = "ln_initial"
+  ) |> 
+  pivot_longer(
+    cols = c(starts_with("ln_change_educat")), 
+    names_to = "educat_change", 
+    values_to = "ln_change_rate"
+  ) |> 
+  mutate(
+    educat_initial = str_replace_all(educat_initial, "initial_", ""),
+    educat_change = str_replace_all(educat_change, "ln_change_", "")
+  ) |> 
+  dplyr::filter(educat_initial == educat_change) |>
+  rename(educat = educat_initial) |>
+  select(-educat_change) 
+```
+
+### Average 
+
+```{r}
+df_plot_gib_edu |>
+  summarise(
+    ln_initial = mean(ln_initial, na.rm = TRUE),
+    ln_change_rate = mean(ln_change_rate, na.rm = TRUE),
+    .by = c(city_name, educat)
+  ) |> 
+  ggplot(aes(x = ln_initial, y = ln_change_rate)) +
+    geom_point(alpha = 0.5, colour = "#333333",
+               fill = "#333333") +
+    scale_y_continuous(
+      limits = c(-0.25, 0.6),
+      breaks = seq(-0.2, 0.6, 0.2)
+    ) +
+    geom_hline(yintercept = 0,
+               linewidth = 0.6,
+               colour = "black",
+               linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ educat,
+               scales = "free") +
+    theme_bw(base_family = "HiraKakuPro-W3") +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      # plot.title = element_text(size = 15),
+      # axis.text.x = element_text(size = 20),
+      # axis.text.y = element_text(size = 20),
+      # axis.title.x = element_text(size = 22),
+      # axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      # strip.text = element_text(size = 22),
+      # strip.text.x = element_text(size = 20)
+      ) +
+    labs(
+      title = "Gibrat's law",
+      x = "Initial size (log)",
+      y = "Growth rate (log)"
+      ) 
+```
+
+
+```{r}
+divide_educ_by_year <- function(df_plot_gib_edu, educat_i) {
+
+  plot_output <- 
+    ggplot(
+      data = df_plot_gib_edu |> dplyr::filter(educat == paste0("educat", educat_i)),
+      mapping = aes(x = ln_initial, y = ln_change_rate)) +
+      geom_point(alpha = 0.5, colour = "#333333",
+                fill = "#333333") +
+      geom_hline(yintercept = 0,
+                linewidth = 0.6,
+                colour = "black",
+                linetype = "solid") +
+      geom_smooth(method = "lm",
+                  formula = y ~ x,
+                  se = FALSE,
+                  color = "#3C8DAD",
+                  linewidth = 1.3) +
+      facet_wrap(~ year,
+                scales = "free",
+                ncol = 3) +
+      theme_bw(base_family = "HiraKakuPro-W3") +
+      theme(
+        panel.border       = element_blank(),
+        axis.line.x.bottom = element_line(color = 'black'),
+        axis.line.y.left   = element_line(color = 'black'),
+        axis.line.y.right  = element_line(color = 'black'),
+        axis.text.y.right  = element_blank(),
+        # plot.title = element_text(size = 15),
+        # axis.text.x = element_text(size = 20),
+        # axis.text.y = element_text(size = 20),
+        # axis.title.x = element_text(size = 22),
+        # axis.title.y = element_text(size = 22),
+        panel.grid.major.y = element_line(color = "lightgray"),
+        strip.background = element_blank(),
+        # strip.text = element_text(size = 22),
+        # strip.text.x = element_text(size = 20)
+        ) +
+      labs(
+        title = paste0("Educat:", educat_i),
+        x = "Initial size (log)",
+        y = "Growth rate (log)"
+        ) 
+
+  plot_output
+}
+```
+
+### educat 1
+- Less than primary, primary and lower secondary education (educats 0-2)
+```{r}
+#| fig-height: 10
+#| fig-width: 12
+divide_educ_by_year(df_plot_gib_edu, "1")
+```
+
+```{r}
+estimate_educat_1 <- create_lm(df_plot_gib_edu |> dplyr::filter(educat == "educat1"), "ln_change_rate", "ln_initial") 
+create_model_summary(estimate_educat_1)
+```
+
+### educat 2
+- Upper secondary and post-secondary non-tertiary education (educats 3 and 4)
+  - 高校相当
+```{r}
+#| fig-height: 10
+#| fig-width: 12
+divide_educ_by_year(df_plot_gib_edu, "2")
+```
+
+```{r}
+estimate_educat_2 <- create_lm(df_plot_gib_edu |> dplyr::filter(educat == "educat2"), "ln_change_rate", "ln_initial") 
+create_model_summary(estimate_educat_2)
+```
+
+### educat 3
+- Tertiary education (educats 5-8)
+  - 大学卒業以上
+```{r}
+#| fig-height: 10
+#| fig-width: 12
+divide_educ_by_year(df_plot_gib_edu, "3")
+```
+
+
+```{r}
+estimate_educat_3 <- create_lm(df_plot_gib_edu |> dplyr::filter(educat == "educat3"), "ln_change_rate", "ln_initial") 
+create_model_summary(estimate_educat_3)
+```
