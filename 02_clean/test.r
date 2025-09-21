@@ -3,6 +3,7 @@ select(city_id, city_name, prefecture_name, year, total_foreign  = total, change
 df_jp_native <- read.csv(here("01_data", "intermediate", "population", "japanese_master.csv"), fileEncoding = "cp932") |> 
 select(city_id, city_name, prefecture_name, year, total_native = total, change_native = change)
 
+renv::paths$cache()
 
 df_jp |>
   left_join(df_jp_native, by = c("city_id", "city_name", "prefecture_name", "year")) |> 
@@ -26,5 +27,7 @@ df_de |>
   dplyr::filter(year == 2019) |>
   dplyr::filter(change_native < 0, complement > 0)
 
+Sys.getenv("RENV_PATHS_CACHE")
+Sys.unsetenv("RENV_PATHS_CACHE")
 
-jjj
+Sys.getenv("RENV_PATHS_CACHE")

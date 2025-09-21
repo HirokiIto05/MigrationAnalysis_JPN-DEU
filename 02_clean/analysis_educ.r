@@ -15,7 +15,6 @@ main <- function() {
   )
 }
 
-
 select_cols_educ <- function(df_educ) {
 
   df_output <- df_educ |>
@@ -35,3 +34,4 @@ merge_educ_age <- function(df_educ, df_age) {
       educat_3_foreign = round(educat_3_foreign * y25_foreign)
     )
 }
+

@@ -16,7 +16,8 @@ modify_german_reg_data <- function(df_german_foreign, df_corr) {
 
 aggregate_population_by_nuts2 <- function(df) {
 
-  df_output <- df |>
+  df_main |>
+  # df_output <- df |>
     reframe(
       across(
         c(
@@ -29,7 +30,9 @@ aggregate_population_by_nuts2 <- function(df) {
           exits,
           exits_without_deaths_and_deletions,
           exit_by_death),
-          ~sum(.x, na.rm = TRUE)), .by = c(nuts_code2, city_name, year))
+          ~sum(.x, na.rm = TRUE)), .by = c(nuts_code2, city_name, year)) |> View()
+
+  return(df_output)
 }
 
 modify_german_native_data <- function(df_german_native) {

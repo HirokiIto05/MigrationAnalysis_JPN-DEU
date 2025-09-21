@@ -1,0 +1,1271 @@
+---
+title: "250910_country"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+  output: asis
+---
+
+
+```{python}
+import polars as pl
+from pyprojroot.here import here
+import plotnine as pn
+from great_tables import GT
+from great_tables.data import gtcars
+import gt_extras as gte
+from great_tables import GT
+from great_tables.data import airquality
+from great_tables import html
+```
+
+
+
+# 目的
+## Previous results
+ドイツでは、地方で外国人が増えていることがわかっている。（Gibrat's law不成立）
+では、どのような属性が増えているのか？ \   
+日本でも、統計的に優位に地方で外国人が増えているが、ドイツほどではない。
+
+```{python}
+df_edu_jp_raw = pl.read_csv(
+    source = here("01_data/intermediate/japan/education.csv"), encoding="cp932"
+)
+
+df_edu_de_raw = pl.read_excel(
+    source = here("01_data/intermediate/german/educ_master.xlsx")
+).filter(pl.col("city_name") != "Saarland") # No data 
+
+df_cores = pl.read_excel(
+  source = here("01_data/intermediate/german/nuts_correspondence.xlsx")
+)
+
+df_de_foreign = pl.read_csv(
+  source = here("01_data/intermediate/german/foreign_master.csv")
+)
+
+# The year of age data is only 2011 and 2022, so we need to adjust the year. The education data is only 2010 and 2020.
+df_de_age = (
+  pl.read_excel(
+  here("01_data/intermediate/german/age_master.xlsx"))
+  .with_columns(
+    pl.when(pl.col("year") == 2011)
+    .then(pl.lit(2010))
+    .when(pl.col("year") == 2022)
+    .then(pl.lit(2020))
+    .alias("year")
+)
+)
+```
+
+
+```{python}
+params_edu_color = {"low":"#F6FEAA", "middle":"#C7DFC5", "high":"#C1DBE3"}
+```
+
+
+```{python}
+df_class_urban_jp = (pl.read_excel(
+  here("01_data/intermediate/grid_pop/jp_pref_city_map.xlsx")
+).rename({
+  "prefecture_name": "prefecture_name",
+  "region_type": "type_urban_rural"
+})
+.with_columns(
+    pl.when(pl.col("type_urban_rural") == "Cities").then(pl.lit("big"))
+     .when(pl.col("type_urban_rural") == "Towns & semi-dense areas").then(pl.lit("urban"))
+     .when(pl.col("type_urban_rural") == "Rural areas").then(pl.lit("rural"))
+     .otherwise(pl.col("type_urban_rural"))
+     .alias("type_urban_rural")
+  ))
+
+df_class_urban_de = (pl.read_excel(
+  here("01_data/intermediate/grid_pop/de_county_city_map.xlsx")
+).rename({
+  "county_name": "county_name",
+  "county_id": "county_id",
+  "county_type": "class_urban"
+})
+.with_columns(
+  pl.lit(2019).alias("year")
+)
+.with_columns(
+    pl.when(pl.col("class_urban") == "Cities").then(pl.lit("big"))
+     .when(pl.col("class_urban") == "Towns & semi-dense areas").then(pl.lit("urban"))
+     .when(pl.col("class_urban") == "Rural areas").then(pl.lit("rural"))
+     .otherwise(pl.col("class_urban"))
+     .alias("class_urban")
+  )
+)
+```
+
+```{python}
+df_edu_jp = (
+  df_edu_jp_raw
+  .with_columns(
+    pl.col("value").sum().over(["year", "prefecture_id", "prefecture_name"]).alias("sum_value")
+  )
+  .with_columns(
+    (pl.col("value") / pl.col("sum_value")).alias("percent")
+  )
+)
+```
+
+```{python}
+df_edu_jp_analysis = (
+  df_edu_jp
+  .join(df_class_urban_jp, on="prefecture_name", how="left")
+)
+```
+
+```{python}
+df_class_urban_de = df_class_urban_de.join(df_cores, on=["county_name", "county_id"], how = "left")
+```
+
+
+```{python}
+df_city_class_de = (
+  pl.read_excel(
+    here("01_data/intermediate/grid_pop/de_nuts2_city_map.xlsx")
+  )
+  .rename({
+    "nuts2_id": "nuts_code2",
+    "nuts2_name": "city_name",
+    "region_type": "class_urban"
+  })
+  .with_columns(
+    pl.when(pl.col("class_urban") == "Cities").then(pl.lit("big"))
+     .when(pl.col("class_urban") == "Towns & semi-dense areas").then(pl.lit("urban"))
+     .when(pl.col("class_urban") == "Rural areas").then(pl.lit("rural"))
+     .otherwise(pl.col("class_urban"))
+     .alias("class_urban")
+  )
+)
+```
+
+
+```{python}
+df_de_foreign_19 = (
+  df_de_foreign
+  .filter(pl.col("year") == 2019)
+  .select(["county_id", "total_value", "year"])
+)
+```
+
+```{python}
+df_edu_de = (
+  df_edu_de_raw
+  .with_columns(
+    pl.when(pl.col("year") == 2011)
+    .then(pl.lit(2010))
+    .when(pl.col("year") == 2022)
+    .then(pl.lit(2020))
+    .otherwise(pl.col("year"))
+    .alias("year")
+  )
+  .join(df_city_class_de, on="city_name", how="left")
+)
+```
+
+```{python}
+def add_population_data_de(df_edu_de):
+
+  df_output = (
+    df_edu_de
+    .join(df_de_age, on=["city_name", "year"], how="left")
+    .filter(pl.col("year").is_in([2010, 2020]))
+    .with_columns(
+      (pl.col("educat_1_foreign") * pl.col("y25_64")).round(0).alias("lv_edu_1"),
+      (pl.col("educat_2_foreign") * pl.col("y25_64")).round(0).alias("lv_edu_2"),
+      (pl.col("educat_3_foreign") * pl.col("y25_64")).round(0).alias("lv_edu_3")
+    )
+  )
+
+  return df_output
+```
+
+
+```{python}
+order_urban_col = ["big", "urban", "rural"]
+order_lv_edu = ["high", "middle", "low"]
+```
+
+
+```{python}
+df_de_edu_percent = (
+  add_population_data_de(df_edu_de)
+  .rename(
+    {"class_urban" : "type_urban_rural"}
+  )
+  .unpivot(
+    index =["nuts_code2", "type_urban_rural", "city_name", "year"],
+    # value_vars=["lv_edu"],
+    variable_name="lv_edu",
+    value_name="value"
+  )
+  .filter(pl.col("lv_edu").str.starts_with("educat"))
+  .with_columns(
+    pl.when(pl.col("lv_edu") == "educat_1_foreign")
+    .then(pl.lit("low"))
+    .when(pl.col("lv_edu") == "educat_2_foreign")
+    .then(pl.lit("middle"))
+    .otherwise(pl.lit("high"))
+    .alias("lv_edu")
+  )
+  .rename(
+    {"value": "percent"}
+  )
+)
+```
+
+
+```{python}
+df_de_edu_level = (
+  add_population_data_de(df_edu_de)
+  .rename(
+    {"class_urban" : "type_urban_rural"}
+  )
+  .unpivot(
+    index =["nuts_code2", "type_urban_rural", "city_name", "year"],
+    # value_vars=["lv_edu"],
+    variable_name="lv_edu",
+    value_name="value"
+  )
+  .filter(pl.col("lv_edu").str.starts_with("lv_edu"))
+  .with_columns(
+    pl.when(pl.col("lv_edu") == "lv_edu_1")
+    .then(pl.lit("low"))
+    .when(pl.col("lv_edu") == "lv_edu_2")
+    .then(pl.lit("middle"))
+    .otherwise(pl.lit("high"))
+    .alias("lv_edu")
+  )
+)
+```
+
+```{python}
+df_edu_de_analysis = (
+  df_de_edu_percent.join(df_de_edu_level, on=["nuts_code2", "type_urban_rural", "city_name", "year", "lv_edu"], how="inner")
+  .sort(["city_name", "year"])
+  .with_columns(
+    pl.col("type_urban_rural").cast(pl.Enum(order_urban_col))
+    )
+  )
+```
+
+# The number of cities by degree of urbanization
+
+```{python}
+def count_cities_by_class(df, city_name_col, urban_col):
+
+  order_urban_col = ["big", "urban", "rural"]
+
+  df_table = (
+    df
+    .group_by(urban_col)
+    .agg(pl.col(city_name_col).n_unique().alias("n"))
+    .with_columns(
+      pl.col(urban_col).cast(pl.Enum(order_urban_col))
+    )
+    .sort(urban_col)
+  )
+
+  return (df_table)
+```
+
+
+```{python}
+#| layout-nrow: 1
+tbl_de = count_cities_by_class(df_edu_de_analysis, "city_name", "type_urban_rural").rename({"n" : "n_de"})
+tbl_jp = count_cities_by_class(df_edu_jp_analysis, "prefecture_name", "type_urban_rural").rename({"n" : "n_jp"})
+```
+
+```{python}
+df_base_tbl = (
+  pl.concat([tbl_de.rename({"type_urban_rural" : "type_urban_rural_de"}), tbl_jp], how="horizontal")
+)
+```
+
+
+## Table: Number of residents by degree of urbanization (Germany & Japan)
+
+```{python}
+# Table: Number of residents by degree of urbanization (Germany & Japan)
+
+def residents_by_urbanization(df, area_col, urban_col, value_col, country, year):
+  df_out = (
+    df
+    .filter(pl.col("year") == year)
+    .group_by(urban_col)
+    .agg(
+      total_residents=pl.col(value_col).sum().cast(pl.Int64)
+    )
+    .with_columns(
+      pl.lit(country).alias("country"),
+      pl.lit(year).alias("year"),
+      pl.col(urban_col).cast(pl.Enum(order_urban_col))
+    )
+    .sort(urban_col)
+  )
+  total = df_out["total_residents"].sum()
+  df_out = df_out.with_columns(
+    (pl.col("total_residents") / total).round(3).alias("share")
+  )
+  return df_out
+
+# Germany: sum over city_name for 2010 and 2020
+de_residents_2010 = residents_by_urbanization(
+  add_population_data_de(df_edu_de).rename({"class_urban": "type_urban_rural"}),
+  "city_name", "type_urban_rural", "y25_64", "Germany", 2010
+)
+de_residents_2020 = residents_by_urbanization(
+  add_population_data_de(df_edu_de).rename({"class_urban": "type_urban_rural"}),
+  "city_name", "type_urban_rural", "y25_64", "Germany", 2020
+)
+
+# Japan: sum over prefecture_name for 2010 and 2020
+jp_residents_2010 = residents_by_urbanization(
+  df_edu_jp_raw.join(df_class_urban_jp, on="prefecture_name", how="left"),
+  "prefecture_name", "type_urban_rural", "value", "Japan", 2010
+)
+jp_residents_2020 = residents_by_urbanization(
+  df_edu_jp_raw.join(df_class_urban_jp, on="prefecture_name", how="left"),
+  "prefecture_name", "type_urban_rural", "value", "Japan", 2020
+)
+
+# Combine tables for 2010 and 2020
+def combine_residents_tables(de_tbl, jp_tbl):
+  return pl.concat([
+    de_tbl.rename({
+      "type_urban_rural": "type_urban_rural_de",
+      "total_residents": "n_de",
+      "share": "share_de"
+    }).drop(["country", "year"]),
+    jp_tbl.rename({
+      "type_urban_rural": "type_urban_rural_jp",
+      "total_residents": "n_jp",
+      "share": "share_jp"
+    }).drop(["country", "year"])
+  ], how="horizontal")
+
+df_residents_tbl_2010 = combine_residents_tables(de_residents_2010, jp_residents_2010)
+df_residents_tbl_2020 = combine_residents_tables(de_residents_2020, jp_residents_2020)
+
+# Display tables for 2010 and 2020
+for year, tbl in zip([2010, 2020], [df_residents_tbl_2010, df_residents_tbl_2020]):
+  display(
+    GT(tbl)
+    .tab_header(
+      title=f"Number of Residents by Degree of Urbanization ({year})",
+      subtitle="Japan and Germany (Age 25-64)"
+    )
+    .tab_spanner(
+      label="Germany",
+      columns=["type_urban_rural_de", "n_de", "share_de"]
+    )
+    .tab_spanner(
+      label="Japan",
+      columns=["type_urban_rural_jp", "n_jp", "share_jp"]
+    )
+    .cols_label(
+      type_urban_rural_de=html("City Size"),
+      n_de=html("Residents"),
+      share_de=html("Share"),
+      type_urban_rural_jp=html("City Size"),
+      n_jp=html("Residents"),
+      share_jp=html("Share")
+    )
+  )
+```
+
+## Table: Number of residents by education level
+
+日本の中学卒業の外国人数のみ、唯一の減少。
+日本、ドイツともに高学歴化が進んでいる。
+
+```{python}
+# Table: Number of residents by degree of urbanization and education level (Germany & Japan)
+
+def residents_by_education(df, edu_col, value_col, country, year):
+  df_out = (
+    df
+    .filter(pl.col("year") == year)
+    .group_by([edu_col])
+    .agg(
+      total_residents=pl.col(value_col).sum().cast(pl.Int64)
+    )
+    .with_columns(
+      pl.lit(country).alias("country"),
+      pl.lit(year).alias("year"),
+      pl.col(edu_col).cast(pl.Enum(order_lv_edu))
+    )
+    .sort(edu_col)
+  )
+  total = df_out["total_residents"].sum()
+  df_out = df_out.with_columns(
+    (pl.col("total_residents") / total).round(3).alias("share")
+  )
+  return df_out
+
+```
+
+
+```{python}
+# Germany: sum for 2010 and 2020, by education level (no urbanization)
+
+df_de_edu_level_long = (
+  add_population_data_de(df_edu_de)
+  .unpivot(
+    index=["nuts_code2", "city_name", "year"],
+    variable_name="lv_edu",
+    value_name="value"
+  )
+  .filter(pl.col("lv_edu").str.starts_with("lv_edu"))
+  .with_columns(
+    pl.when(pl.col("lv_edu") == "lv_edu_1")
+    .then(pl.lit("low"))
+    .when(pl.col("lv_edu") == "lv_edu_2")
+    .then(pl.lit("middle"))
+    .when(pl.col("lv_edu") == "lv_edu_3")
+    .then(pl.lit("high"))
+    .otherwise(pl.col("lv_edu"))
+    .alias("lv_edu"),
+    pl.col("value").cast(pl.Float64, strict=False).alias("value")  # ensure value is numeric
+  )
+  .filter(pl.col("value").is_not_null())
+)
+
+```
+
+```{python}
+de_residents_edu_2010 = residents_by_education(
+  df_de_edu_level_long,
+  "lv_edu", "value", "Germany", 2010
+)
+de_residents_edu_2020 = residents_by_education(
+  df_de_edu_level_long,
+  "lv_edu", "value", "Germany", 2020
+)
+
+# Japan: sum for 2010 and 2020, by education level (no urbanization)
+jp_residents_edu_2010 = residents_by_education(
+  df_edu_jp_analysis,
+  "lv_edu", "value", "Japan", 2010
+)
+jp_residents_edu_2020 = residents_by_education(
+  df_edu_jp_analysis,
+  "lv_edu", "value", "Japan", 2020
+)
+
+
+```
+
+```{python}
+def combine_residents_edu_tables_simple(de_tbl, jp_tbl):
+  return pl.concat([
+    de_tbl.rename({
+      "lv_edu": "lv_edu_de",
+      "total_residents": "n_de",
+      "share": "share_de"
+    }).drop(["country", "year"]),
+    jp_tbl.rename({
+      "lv_edu": "lv_edu_jp",
+      "total_residents": "n_jp",
+      "share": "share_jp"
+    }).drop(["country", "year"])
+  ], how="horizontal")
+
+df_residents_edu_tbl_2010 = combine_residents_edu_tables_simple(de_residents_edu_2010, jp_residents_edu_2010)
+df_residents_edu_tbl_2020 = combine_residents_edu_tables_simple(de_residents_edu_2020, jp_residents_edu_2020)
+```
+
+```{python}
+# Merge the two tables for 2010 and 2020, add a 'year' column, and plot time series using plotnine
+
+df_residents_edu_tbl_2010 = df_residents_edu_tbl_2010.with_columns(pl.lit(2010).alias("year"))
+df_residents_edu_tbl_2020 = df_residents_edu_tbl_2020.with_columns(pl.lit(2020).alias("year"))
+
+# Stack vertically for Germany
+df_de_long = (
+  pl.concat([
+    df_residents_edu_tbl_2010.select(["lv_edu_de", "n_de", "share_de", "year"]),
+    df_residents_edu_tbl_2020.select(["lv_edu_de", "n_de", "share_de", "year"])
+  ], how="vertical")
+  .rename({"lv_edu_de": "lv_edu", "n_de": "n", "share_de": "share"})
+  .with_columns(pl.lit("Germany").alias("country"))
+)
+
+# Stack vertically for Japan
+df_jp_long = (
+  pl.concat([
+    df_residents_edu_tbl_2010.select(["lv_edu_jp", "n_jp", "share_jp", "year"]),
+    df_residents_edu_tbl_2020.select(["lv_edu_jp", "n_jp", "share_jp", "year"])
+  ], how="vertical")
+  .rename({"lv_edu_jp": "lv_edu", "n_jp": "n", "share_jp": "share"})
+  .with_columns(pl.lit("Japan").alias("country"))
+)
+
+# Combine both countries
+df_edu_long = pl.concat([df_de_long, df_jp_long], how="vertical")
+
+# Plot time series of number of residents by education level and country
+import plotnine as pn
+
+(
+  pn.ggplot(df_edu_long, pn.aes(x="year", y="n", color="lv_edu", group="lv_edu"))
+  + pn.geom_line(size=1.5)
+  + pn.geom_point(size=2)
+  + pn.facet_wrap("country", ncol=2, scales="fixed")
+  + pn.theme_bw()
+  + pn.labs(
+    title="Number of Foreign Residents by Education Level (2010 & 2020)",
+    x="Year",
+    y="Number of Residents",
+    color="Education Level"
+  )
+  + pn.theme(
+    legend_position="bottom",
+    legend_title=pn.element_blank(),
+    strip_background=pn.element_blank(),
+    axis_title_x=pn.element_text(size=12),
+    axis_title_y=pn.element_text(size=12),
+    axis_text_x=pn.element_text(size=11),
+    axis_text_y=pn.element_text(size=11)
+  )
+)
+```
+
+```{python}
+# Display tables for 2010 and 2020
+for year, tbl in zip([2010, 2020], [df_residents_edu_tbl_2010, df_residents_edu_tbl_2020]):
+  display(
+    GT(tbl)
+    .tab_header(
+      title=f"Number of Residents by Education Level ({year})",
+      subtitle="Japan and Germany (Age 25-64)"
+    )
+    .tab_spanner(
+      label="Germany",
+      columns=["lv_edu_de", "n_de", "share_de"]
+    )
+    .tab_spanner(
+      label="Japan",
+      columns=["lv_edu_jp", "n_jp", "share_jp"]
+    )
+    .cols_label(
+      lv_edu_de=html("Education Level"),
+      n_de=html("Residents"),
+      share_de=html("Share"),
+      lv_edu_jp=html("Education Level"),
+      n_jp=html("Residents"),
+      share_jp=html("Share")
+    )
+  )
+```
+
+## Summary Stats
+
+Low: 中卒以下 \
+Middle: 高校卒業 \
+High: 大卒以上
+
+
+## Rural
+
+ドイツは地方に大卒以上の人口が増え、割合も増加している。
+
+```{python}
+def generate_compare_df(df, country, type_urban, outcome) :
+  df_output = (
+  df
+  .filter(pl.col("type_urban_rural") == type_urban)
+  .group_by(["type_urban_rural", "lv_edu", "year"])
+  .agg(
+    sum_value = pl.col("value").sum().cast(pl.Int64),
+    average_percent = pl.col("percent").mean().cast(pl.Float64).round(2)
+  )
+  .with_columns(
+    pl.lit(country).alias("country")
+  )
+  .with_columns(
+    pl.col("lv_edu").cast(pl.Enum(order_lv_edu))
+    )
+  .with_columns(
+    pl.col("type_urban_rural").cast(pl.Enum(order_urban_col))
+    )
+  )
+  return df_output
+```
+
+```{python}
+df_compare_rural = (
+  pl.concat([
+    generate_compare_df(df_edu_de_analysis, "Germany", "rural", "value"), 
+    generate_compare_df(df_edu_jp_analysis, "Japan", "rural", "value")], how="vertical")
+)
+df_compare_urban = (
+  pl.concat([
+    generate_compare_df(df_edu_de_analysis, "Germany", "urban", "value"), 
+    generate_compare_df(df_edu_jp_analysis, "Japan", "urban", "value")], how="vertical")
+)
+df_compare_big = (
+  pl.concat([
+    generate_compare_df(df_edu_de_analysis, "Germany", "big", "value"), 
+    generate_compare_df(df_edu_jp_analysis, "Japan", "big", "value")], how="vertical")
+)
+```
+
+```{python}
+def plot_rural_edu(df_compare, outcome_i, year_i):
+
+  outcome_max = df_compare[outcome_i].max()
+
+  plot = (
+    pn.ggplot(df_compare.filter(pl.col("year") == year_i), pn.aes(x="lv_edu", y=outcome_i, fill="lv_edu")) +
+    pn.geom_col() +
+    pn.facet_wrap("country", ncol=1, scales="fixed") +
+    pn.theme_bw() +
+    pn.theme(
+      legend_position="bottom",
+      legend_title=pn.element_blank(),
+      strip_background=pn.element_blank(),
+      axis_title_x=pn.element_blank(),
+      axis_text_x=pn.element_text(angle=45)
+    ) +
+    pn.coord_flip()+
+    pn.labs(
+      title = str(year_i)
+    ) +
+    pn.scale_y_continuous(
+      limits=[0, outcome_max]
+    )
+  )
+  return plot
+```
+
+ドイツ、日本ともに、大学卒業以上の外国人の増加率が最も高い。日本は、都市レベル別に見ても、低学歴層が減っており、高校卒業以上の層が増加している。
+日本とドイツで異なる点は、ドイツは地方での低学歴層の数が最も多い点が特徴的である。地方での伸びは低学歴層の伸びが最も寄与している可能性が高い。
+
+一方日本では、低学歴層が減少しており、日本の地方では大卒と高卒の伸びによって、地方は支えられている。
+
+
+
+```{python}
+plot_rural_edu(df_compare_rural, "sum_value", 2010)
+```
+
+```{python}
+plot_rural_edu(df_compare_rural, "sum_value", 2020)
+```
+
+```{python}
+def generate_compare_table(df_compare, area_label):
+  df_2010 = (
+    df_compare.filter(pl.col("year") == 2010)
+    .sort(["country", "lv_edu"], descending=[False, False])
+    .select(["country", "lv_edu", "sum_value"])
+  )
+
+  df_2020 = (
+    df_compare.filter(pl.col("year") == 2020)
+    .sort(["country", "lv_edu"], descending=[False, False])
+    .select(["country", "lv_edu", "sum_value"])
+    .rename({
+      "sum_value": "sum_value_right"
+    })
+  )
+
+  df_compare_tbl = (
+    df_2010
+    .join(df_2020, on=["country", "lv_edu"], how="inner")
+    .with_columns([
+      (pl.col("sum_value_right") - pl.col("sum_value")).alias("increase_number"),
+      ((pl.col("sum_value_right") - pl.col("sum_value")) / pl.col("sum_value") * 100).round(2).alias("increase_rate_percent")
+    ])
+  )
+
+  return (
+    GT(df_compare_tbl)
+    .tab_header(
+      title=f"{area_label}: Education Level Comparison",
+      subtitle="2010 vs 2020"
+    )
+    .tab_spanner(
+      label="2010",
+      columns=["lv_edu", "sum_value"]
+    )
+    .tab_spanner(
+      label="2020",
+      columns=["sum_value_right"]
+    )
+    .cols_label(
+      country=html("Country"),
+      lv_edu=html("Education Level"),
+      sum_value=html("Population (2010)"),
+      sum_value_right=html("Population (2020)"),
+      increase_number=html("Increase Number"),
+      increase_rate_percent=html("Increase Rate (%)")
+    )
+  )
+
+# 表の生成例
+generate_compare_table(df_compare_rural, "Rural")
+```
+
+
+### Japan
+
+```{python}
+def plot_rural_edu_japan(df_compare_rural, outcome_i):
+
+  plot = (
+    pn.ggplot(df_compare_rural, pn.aes(x="lv_edu", y=outcome_i, fill="lv_edu")) +
+    pn.geom_col() +
+    pn.theme_bw() +
+    pn.facet_wrap("year", ncol=1, scales="fixed") +
+    pn.theme(
+      legend_position="bottom",
+      legend_title=pn.element_blank(),
+      strip_background=pn.element_blank(),
+      axis_title_x=pn.element_blank(),
+      axis_text_x=pn.element_text(angle=45)
+    ) +
+    pn.coord_flip() 
+    # scale_fill_manual(values={"low":"#FFA69E", "middle":"", "high": ""}) +
+    # pn.scale_y_continuous(
+    #   limits=[0, 1000000],
+    #   breaks=[0, 200000, 400000, 600000, 800000, 1000000]
+    # )
+  )
+  return plot
+```
+
+
+```{python}
+plot_rural_edu_japan(df_compare_rural.filter(pl.col("country") == "Japan"), "sum_value")
+```
+
+
+地方のみの増加数のバランスを見ると、日本とドイツでは学歴については異なる傾向を示している。
+
+日本は、どの都市レベルを分析しても同じような傾向が見られるが、ドイツは都市部は高学歴層、地方部は低学歴層
+
+
+## Urban 
+
+
+ドイツの伸び率を見ると、Ruralと同様の傾向が見られ、大卒割合が約2倍に増加している。また、その次に中学卒業、高校卒業の伸び率が続く。
+
+日本は、大卒数の増加率が最も高く、高卒、中卒と続く。中学卒業はRuralと同様に減少している。
+
+
+
+```{python}
+plot_rural_edu(df_compare_urban, "sum_value", 2010)
+```
+
+```{python}
+plot_rural_edu(df_compare_urban, "sum_value", 2020)
+```
+```{python}
+generate_compare_table(df_compare_urban, "Urban")
+```
+
+### Japan
+
+```{python}
+plot_rural_edu_japan(df_compare_urban.filter(pl.col("country") == "Japan"), "sum_value")
+```
+
+
+## Big
+
+（特にドイツの）サンプルサイズが小さいため、この分類に限った分析よりは、Urban&Bigの分析の方が良いかもしれない。
+また、Bigの定義が最頻値法（上記）を用いているため、正確ではない。Munichがurbanに入って、bremenがbigに入っているなど、都市の分類が正確ではないため、注意が必要。Bremenはそれ自体が州であり、市区町村のため、Bigに分類されてしまうが、563,290人で、ドイツ国内で11番目
+
+
+Bigはどちらも、大卒、高卒、中卒の順に増加している。日本は、ドイツと同様に大卒の伸びが最も高いが、ドイツは中学卒業の伸び率が高いのに対し、日本は中学卒業の減少率が高い。
+
+```{python}
+plot_rural_edu(df_compare_big, "sum_value", 2010)
+```
+
+```{python}
+plot_rural_edu(df_compare_big, "sum_value", 2020)
+```
+
+```{python}
+generate_compare_table(df_compare_big, "Big")
+```
+
+
+
+## Trend of share of foreign population by education level and the degree of urbanization
+
+
+ドイツは、大卒割合はどの地域レベルでも増えている。高卒割合は都市部以外で減少し、特にRural areaで中学卒業レベルの増加が見られる。
+
+同様に日本も、大卒割合は全ての地域で最も増えており、全ての地域で、8割から10割ほど大きな増加が見られる。ドイツと最も異なる点は、中学卒業割合が著しく低下しており、全ての地域で減少している。
+
+```{python}
+df_plot_edu_de = (
+  df_edu_de_analysis
+  .group_by(["type_urban_rural", "lv_edu", "year"])
+  .agg(
+    average_percent = pl.col("percent").mean().round(2)
+  )
+  .with_columns(
+    pl.col("type_urban_rural").cast(pl.Enum(order_urban_col))
+  )
+  .with_columns(
+    pl.col("lv_edu").cast(pl.Enum(order_lv_edu))
+  )
+)
+```
+
+```{python}
+df_plot_edu_jp = (
+  df_edu_jp_analysis.group_by(["type_urban_rural", "lv_edu", "year"])
+  .agg(
+    average_percent = pl.col("percent").mean().round(2)
+  )
+  .with_columns(
+    pl.col("type_urban_rural").cast(pl.Enum(order_urban_col))
+  )
+  .with_columns(
+    pl.col("lv_edu").cast(pl.Enum(order_lv_edu))
+  )
+)
+```
+
+
+
+### Germany
+
+```{python}
+(
+  pn.ggplot(df_plot_edu_de, pn.aes(x="year", y="average_percent", color="lv_edu")) +
+  pn.geom_point() +
+  pn.geom_line() +
+  pn.facet_wrap("type_urban_rural") +
+  pn.theme_bw() +
+  pn.theme(
+    legend_position="bottom",
+    legend_title=pn.element_blank(),
+    strip_background=pn.element_blank(),
+    axis_title_x=pn.element_blank(),
+    axis_text_x=pn.element_text(angle=45)
+  ) +
+  pn.scale_x_continuous(breaks=list(range(2010, 2023, 2))) 
+  # pn.scale_color_manual(values=params_edu_color)
+)
+```
+
+
+### Japan
+```{python}
+(
+  pn.ggplot(df_plot_edu_jp, pn.aes(x="year", y="average_percent", color="lv_edu")) +
+  pn.geom_point() +
+  pn.geom_line() +
+  pn.facet_wrap("type_urban_rural") +
+  pn.theme_bw() +
+  pn.theme(
+    legend_position="bottom",
+    legend_title=pn.element_blank(),
+    strip_background=pn.element_blank(),
+    axis_title_x=pn.element_blank(),
+    axis_text_x=pn.element_text(angle=45)
+  ) 
+  # pn.scale_x_continuous(breaks=list(range(2010, 2023, 2)))
+)
+```
+
+
+# Country analysis without residents seeking protection
+```{python}
+df_country_de = pl.read_excel(
+  here("01_data/intermediate/german/country_class_master.xlsx")
+)
+
+df_protection_de = pl.read_csv(
+  here("01_data/intermediate/german/protection_master.csv"
+))
+
+```
+
+```{python}
+df_country_de = (
+  df_country_de
+  .with_columns(
+    pl.col("year").cast(pl.Int64, strict=False)
+  )
+  .join(
+    df_protection_de
+      .with_columns(
+        pl.col("year").cast(pl.Int64, strict=False)
+      )
+      .select(["county_id", "year", "country_name", "total"])
+      .rename({"total": "asylum"}),
+    on=["county_id", "year", "country_name"],
+    how="left"
+  )
+  .with_columns(
+    (pl.col("population") - pl.col("asylum").fill_null(0)).alias("population_ex_asylum")
+  )
+)
+```
+
+
+```{python}
+df_country_jp = pl.read_excel(
+  here("01_data/intermediate/japan/country_japan.xlsx"
+  ))
+```
+
+
+```{python}
+print("Germany columns:")
+for col in df_country_de.columns:
+  print("  -", col)
+print("Japan columns:")
+for col in df_country_jp.columns:
+  print("  -", col)
+```
+
+
+日本の外国人数の約8％は国籍がunknoewnであるため、除外している。
+ドイツの外国人数の約2.3％は国籍が以下のため、除外している。
+
+1 British Overseas Territories 
+2 Yugoslavia, Socialist Federal Rep. (u. 1992-04-26)
+3 Yugoslavia, Federal Rep.(1992-04-27 to 2003-02-04)
+4 Palestinian Territories
+5 Serbia (incl. Kosovo) (2006-06-03 to 2008-02-16)
+6 Serbia and Montenegro (2003-02-05 to 2006-06-02)
+7 Soviet Union (until 1991-12-25)
+8 Sudan (including South Sudan) (until 2011-07-08)
+9 Czechoslovakia (until 1992-12-31)
+10 Vatican City State
+11 Stateless
+12 Unknown / Not specified
+
+
+```{python}
+# Comparison of cls_income in time series using GT
+
+order_income = ["low", "lower_middle", "upper_middle", "high"]
+
+# For Germany: group by year and cls_income, sum population_ex_asylum
+df_income_de = (
+  df_country_de
+  .group_by(["year", "cls_income"])
+  .agg(
+    total_population=pl.col("population_ex_asylum").sum().cast(pl.Int64)
+  )
+  .with_columns(
+    pl.col("cls_income").cast(pl.Enum(order_income))
+  )
+  .sort(["cls_income", "year"])
+)
+
+# For Japan: group by year and cls_income, sum value
+df_income_jp = (
+  df_country_jp
+  .group_by(["year", "cls_income"])
+  .agg(
+    total_population=pl.col("value").sum().cast(pl.Int64)
+  )
+  .with_columns(
+    pl.col("cls_income").cast(pl.Enum(order_income))
+  )
+  .with_columns(
+    pl.col("year").cast(pl.Int64)
+  )
+  .sort(["cls_income", "year"])
+)
+
+```
+
+
+```{python}
+# Prepare tables for GT (pivot years as columns for easier comparison)
+
+tbl_de = (
+  df_income_de
+  .pivot(values="total_population", index="cls_income", columns="year")
+  .sort("cls_income")
+  .with_columns(pl.lit("Germany").alias("country"))
+  .with_columns([
+    (pl.col("2020") - pl.col("2010")).alias("increase_number"),
+    ((pl.col("2020") - pl.col("2010")) / pl.col("2010") * 100).round(2).alias("increase_rate_percent")
+  ])
+)
+
+tbl_jp = (
+  df_income_jp
+  .pivot(values="total_population", index="cls_income", columns="year")
+  .sort("cls_income")
+  .with_columns(pl.lit("Japan").alias("country"))
+  .with_columns([
+    (pl.col("2020") - pl.col("2010")).alias("increase_number"),
+    ((pl.col("2020") - pl.col("2010")) / pl.col("2010") * 100).round(2).alias("increase_rate_percent")
+  ])
+)
+```
+
+## Germany
+
+```{python}
+# Display Germany table
+GT(tbl_de).tab_header(
+  title="Comparison of Foreign Residents by Income Class (Time Series)",
+  subtitle="Germany (ex-asylum)"
+).cols_label(
+  cls_income=html("Income Class"),
+  country=html("Country")
+)
+```
+
+## Japan
+
+```{python}
+# Display Japan table
+GT(tbl_jp).tab_header(
+  title="Comparison of Foreign Residents by Income Class (Time Series)",
+  subtitle="Japan"
+).cols_label(
+  cls_income=html("Income Class"),
+  country=html("Country")
+)
+```
+
+```{python}
+df_income_both = (
+  pl.concat([df_income_de.with_columns(pl.lit("Germany").alias("country_name")), df_income_jp.with_columns(pl.lit("Japan").alias("country_name"))], how="vertical")
+  # .with_columns(
+  #   pl.col("cls_income").cast(pl.Enum(order_income))
+  # )
+)
+```
+
+上記の結果と合わせると、ドイツは中学卒業割合が高いが、それは主に、高所得国から流入している可能性がある。また、一方で、日本の増加している大学卒業以上の層は、高所得からきているのではなく、他の地域から来ている可能性が高い。
+
+
+日本の増加が、高卒/大卒割合が増えて、中学卒業が減っているが、これは出身国を代理するものではない。明かにドイツの方が高所得からきている外国人が多いが、低学歴。日本は高学歴かが進むものの、低所得国からの増加が著しい
+
+つまり、国別があまり教育水準の大体変数になる可能性は低い。
+
+| 国      | 教育水準の傾向         | 出身国の所得水準の傾向 | 備考                                                         |
+|---------|-----------------------|------------------------|--------------------------------------------------------------|
+| ドイツ  | 低学歴層が多い         | 高所得国が多い         | 高所得国からの流入が多いが、教育水準は必ずしも高くない         |
+| 日本    | 高学歴化が進行         | 低所得国が多い         | 低所得国からの流入が多いが、教育水準は上昇傾向                |
+
+### Line chart: Number of people by income class, divided by year (facet)
+```{python}
+# Line chart: Number of people by income class, divided by year (facet)
+
+# Germany
+(
+  pn.ggplot(
+    df_income_both,
+    pn.aes(x="year", y="total_population", color="cls_income", group="cls_income")
+  )
+  + pn.geom_line(size=1.5)
+  + pn.geom_point(size=2)
+  + pn.theme_bw()
+  + pn.facet_wrap("country_name", ncol=2, scales="fixed")
+  + pn.labs(
+      title="Number of Foreign Residents by Income Class",
+      x="Year",
+      y="Number of People",
+      color="Income Class"
+    )
+  + pn.theme(
+      axis_text_y=pn.element_text(size=12),
+      axis_text_x=pn.element_text(size=12, angle=0),
+      axis_title_y=pn.element_text(size=13),
+      axis_title_x=pn.element_text(size=13),
+      legend_title=pn.element_text(size=13),
+      legend_text=pn.element_text(size=12),
+      strip_background=pn.element_blank(),
+      legend_position = "bottom"
+    )
+  +pn.scale_x_continuous(
+      breaks=[2010, 2015, 2020],
+      limits=[2010, 2020]
+    )
+)
+
+```
+
+
+```{python}
+df_city_size_de = (
+  pl.read_excel(
+    here("01_data/intermediate/grid_pop/de_county_city_map.xlsx")
+  )
+  .rename({
+    "county_type": "class_urban"
+  })
+  .select(["county_id", "class_urban"])
+  .with_columns(
+    pl.when(pl.col("class_urban") == "Cities").then(pl.lit("big"))
+     .when(pl.col("class_urban") == "Towns & semi-dense areas").then(pl.lit("urban"))
+     .when(pl.col("class_urban") == "Rural areas").then(pl.lit("rural"))
+     .otherwise(pl.col("class_urban"))
+     .alias("class_urban")
+  )
+)
+
+df_city_size_jp = (pl.read_excel(
+    here("01_data/intermediate/grid_pop/jp_county_city_map.xlsx")
+  )
+  .select(["county_id", "county_type"])
+  .rename({
+    "county_type": "class"
+  })
+  .with_columns(
+    pl.when(pl.col("class") == "Cities").then(pl.lit("big"))
+     .when(pl.col("class") == "Towns & semi-dense areas").then(pl.lit("urban"))
+     .when(pl.col("class") == "Rural areas").then(pl.lit("rural"))
+     .otherwise(pl.col("class"))
+     .alias("class_urban")
+  ))
+```
+
+
+```{python}
+# Prepare data for plotting: group by country, year, cls_income, and type_urban_rural
+# For Germany
+
+df_plot_de = (
+  df_country_de
+  .join(df_city_size_de, on="county_id", how="left")
+  .group_by(["year", "cls_income", "class_urban"])
+  .agg(
+    total_population=pl.col("population_ex_asylum").sum().cast(pl.Int64)
+  )
+  .with_columns([
+    pl.col("cls_income").cast(pl.Enum(order_income)),
+    pl.col("class_urban").cast(pl.Enum(order_urban_col)),
+    pl.lit("Germany").alias("country")
+  ])
+  .rename({"class_urban": "type_urban_rural"})
+)
+
+# For Japan
+df_plot_jp = (
+  df_country_jp
+  .rename({"city_id": "county_id"})
+  .join(df_city_size_jp, on="county_id", how="left")
+  .rename({"class_urban": "type_urban_rural"})
+  .group_by(["year", "cls_income", "type_urban_rural"])
+  .agg(
+    total_population=pl.col("value").sum().cast(pl.Int64)
+  )
+  .with_columns([
+    pl.col("cls_income").cast(pl.Enum(order_income)),
+    pl.col("type_urban_rural").cast(pl.Enum(order_urban_col)),
+    pl.lit("Japan").alias("country")
+  ])
+  .with_columns(
+    pl.col("year").cast(pl.Int64)
+  )
+)
+
+# Combine both
+df_plot_both = (
+  pl.concat([df_plot_de, df_plot_jp], how="vertical")
+  .filter(pl.col("type_urban_rural").is_not_null())
+  )
+```
+
+```{python}
+# Plot
+# Germany
+(
+  pn.ggplot(
+    df_plot_both.filter(pl.col("country") == "Germany").filter(pl.col("type_urban_rural").is_not_null()),
+    pn.aes(
+      x="year",
+      y="total_population",
+      color="cls_income",
+      group="cls_income"
+    )
+  )
+  + pn.geom_line(size=1.2)
+  + pn.geom_point(size=2)
+  + pn.facet_wrap("type_urban_rural", scales="free_y")
+  + pn.theme_bw()
+  + pn.labs(
+    title="Foreign Residents by Income Class and Urbanization (Germany)",
+    x="Year",
+    y="Number of People",
+    color="Income Class"
+  )
+  + pn.theme(
+    axis_text_x=pn.element_text(size=10, angle=0),
+    axis_text_y=pn.element_text(size=10),
+    axis_title_x=pn.element_text(size=12),
+    axis_title_y=pn.element_text(size=12),
+    legend_title=pn.element_text(size=12),
+    legend_text=pn.element_text(size=11),
+    strip_background=pn.element_blank(),
+    legend_position="bottom"
+  )
+)
+
+```
+
+```{python}
+# Japan
+(
+  pn.ggplot(
+    df_plot_both.filter(pl.col("country") == "Japan"),
+    pn.aes(
+      x="year",
+      y="total_population",
+      color="cls_income",
+      group="cls_income"
+    )
+  )
+  + pn.geom_line(size=1.2)
+  + pn.geom_point(size=2)
+  + pn.facet_wrap("type_urban_rural", scales="free_y")
+  + pn.theme_bw()
+  + pn.labs(
+    title="Foreign Residents by Income Class and Urbanization (Japan)",
+    x="Year",
+    y="Number of People",
+    color="Income Class"
+  )
+  + pn.theme(
+    axis_text_x=pn.element_text(size=10, angle=0),
+    axis_text_y=pn.element_text(size=10),
+    axis_title_x=pn.element_text(size=12),
+    axis_title_y=pn.element_text(size=12),
+    legend_title=pn.element_text(size=12),
+    legend_text=pn.element_text(size=11),
+    strip_background=pn.element_blank(),
+    legend_position="bottom"
+  )
+)
+```
+
+
+
+
+```{python}
+
+
+```

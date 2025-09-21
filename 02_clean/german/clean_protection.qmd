@@ -1,0 +1,133 @@
+
+```{python}
+import polars as pl
+from pyprojroot.here import here
+import plotnine as pn
+import importlib
+import sys
+import os
+```
+
+```{python}
+# os.path.join(here('02_clean/german'))
+# sys.path.append(os.path.join(here('02_clean/german/')))
+# import functions
+import re
+from pathlib import Path
+sys.path.append(str(Path(here('02_clean'))))
+from functions import *
+```
+
+```{python}
+df_raw_10_17 = pl.read_csv(
+  here("01_data/raw/german/foreign/protection_country_10_17.csv"),
+  encoding="utf8",
+  skip_rows=6
+)
+
+df_raw_18_24 = pl.read_csv(
+  here("01_data/raw/german/foreign/protection_country_18_24.csv"),
+  encoding="utf8",
+  skip_rows=6
+)
+
+# Country classification
+df_country_class = pl.read_excel(
+  here("01_data/intermediate/german/country_classification_master.xlsx"))
+```
+
+```{python}
+df_raw = pl.concat([df_raw_10_17, df_raw_18_24], how="vertical")
+```
+
+
+```{python}
+def change_column_names(df):
+  df.columns = [
+    "year",
+    "county_id",
+    "county_name",
+    "country_name",
+    "male",
+    "female",
+    "total"
+  ]
+
+  return df
+```
+
+
+```{python}
+df = change_column_names(df_raw)
+```
+
+```{python}
+def chnage_class_columns(df):
+  df = (
+    df
+    .select(
+      ["year", "county_id", "county_name", "country_name", "total"]
+    )
+    .filter(pl.col("county_id").is_not_null())
+    .with_columns(
+      pl.col("year").str.strptime(pl.Date, "%Y-%m-%d").dt.year().alias("year"),
+      pl.col("county_id").cast(pl.Int64),
+      pl.col("total").str.replace("-", "0").cast(pl.Int64)
+    )
+    .filter(pl.col("country_name") != "Total")
+  )
+  return df
+```
+
+```{python}
+df = chnage_class_columns(df)
+```
+
+```{python}
+df = change_country_names(df)
+```
+
+```{python}
+# The number of residents of other country names consists 2% and 1% of them is non-existent countries.
+# Therefore, we ignore them
+df = (
+  df
+  .join(
+    df_country_class, on="country_name",how="left"
+  )
+  .with_columns(
+    pl.when(pl.col("country_name") == "Stateless")
+    .then(pl.lit("other"))
+    .when(pl.col("country_name") == "Unclear")
+    .then(pl.lit("other"))
+    .otherwise(pl.col("country_name"))
+    .alias("country_name")
+  )
+  .filter(pl.col("cls_income").is_not_null())
+  
+)
+
+# Check the proportion of na country class
+
+# missing_df = (
+#   df
+#   .with_columns(
+#     pl.when(pl.col("country_name") == "Stateless")
+#     .then(pl.lit("other"))
+#     .when(pl.col("country_name") == "Unclear")
+#     .then(pl.lit("other"))
+#     .alias("country_name")
+#   )
+#   .filter(pl.col("cls_income").is_null())
+#   .filter(pl.col("country_name").is_null())
+# )
+
+# missing_df[["total"]].sum() / a[["total"]].sum()
+```
+
+```{python}
+df.write_csv(
+  here("01_data/intermediate/german/protection_master.csv")
+)
+
+```

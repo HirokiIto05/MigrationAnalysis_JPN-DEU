@@ -19,7 +19,7 @@ main <- function() {
     left_join(df_cor, by = "county_id") |>
     left_join(df_geo, by = c("nuts_code3" = "NUTS_CODE"))
 
-  df_analysis <- create_scatter_df(df_de_map, total, lag_i = 5)
+  df_analysis <- generate_df_main(df_de_map, total, lag_i = 5)
 
   plot <- plot_tmap(2014, df_analysis, ln_change_rate_total, "ln_change_rate_total", "Change rate of total population")
 
@@ -73,7 +73,7 @@ select_cols_de <- function(df_de) {
 }
 
 
-create_scatter_df <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
+generate_df_main <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
 
   var_y <- enquo(var_y)
   

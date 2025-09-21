@@ -1,21 +1,17 @@
+# https://ergebnisse.zensus2022.de/datenbank/online/statistic/1000A/table/1000A-2010/table-toolbar#filter=JTdCJTIyaGlkZUVtcHR5Q29scyUyMiUzQWZhbHNlJTJDJTIyaGlkZUVtcHR5Um93cyUyMiUzQWZhbHNlJTJDJTIyY2FwdGlvbiUyMiUzQSU1QiU3QiUyMnZhcmlhYmxlSWQlMjIlM0ElMjIxMDAwQSUyMiUyQyUyMmlkJTIyJTNBJTIyZmlsdGVyLjAlMjIlMkMlMjJ2YWx1ZXNJZHMlMjIlM0ElNUIlMjIxMDAwQSUyMiU1RCUyQyUyMmNoaWxkcmVuJTIyJTNBJTVCJTVEJTJDJTIyc2hvd0FzSW50ZXJsaW5lJTIyJTNBZmFsc2UlMkMlMjJpc0hpZGRlbiUyMiUzQWZhbHNlJTJDJTIyYmxvY2tDb2RlJTIyJTNBJTIyczElMjIlMkMlMjJwb3NzaWJsZVBsYWNlcyUyMiUzQSU1QiU1RCU3RCU1RCUyQyUyMnJvd0hlYWRlciUyMiUzQSU1QiU3QiUyMnZhcmlhYmxlSWQlMjIlM0ElMjJTVEFHJTIyJTJDJTIyaWQlMjIlM0ElMjJyb3dUaXRsZS4wJTIyJTJDJTIydmFsdWVzSWRzJTIyJTNBJTVCJTIyMjAxMS0wNS0wOSUyMiUyQyUyMjIwMjItMDUtMTUlMjIlNUQlMkMlMjJjaGlsZHJlbiUyMiUzQSU1QiU3QiUyMnZhcmlhYmxlSWQlMjIlM0ElMjJBTFRHUjElMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAuMCUyMiUyQyUyMnZhbHVlc0lkcyUyMiUzQSU1QiUyMiUyNVRPVEFMJTI1JTIyJTJDJTIyQUxUMDAwQjAwNCUyMiUyQyUyMkFMVDAwNUIwMDklMjIlMkMlMjJBTFQwMTBCMDE0JTIyJTJDJTIyQUxUMDE1QjAxOSUyMiUyQyUyMkFMVDAyMEIwMjQlMjIlMkMlMjJBTFQwMjVCMDI5JTIyJTJDJTIyQUxUMDMwQjAzNCUyMiUyQyUyMkFMVDAzNUIwMzklMjIlMkMlMjJBTFQwNDBCMDQ0JTIyJTJDJTIyQUxUMDQ1QjA0OSUyMiUyQyUyMkFMVDA1MEIwNTQlMjIlMkMlMjJBTFQwNTVCMDU5JTIyJTJDJTIyQUxUMDYwQjA2NCUyMiUyQyUyMkFMVDA2NUIwNjklMjIlMkMlMjJBTFQwNzBCMDc0JTIyJTJDJTIyQUxUMDc1QjA3OSUyMiUyQyUyMkFMVDA4MEIwODQlMjIlMkMlMjJBTFQwODVCMDg5JTIyJTJDJTIyQUxUMDkwQlhYWCUyMiU1RCUyQyUyMmNoaWxkcmVuJTIyJTNBJTVCJTdCJTIydmFyaWFibGVJZCUyMiUzQSUyMlNUQVpHMSUyMiUyQyUyMmlkJTIyJTNBJTIycm93VGl0bGUuMC4wLjAlMjIlMkMlMjJ2YWx1ZXNJZHMlMjIlM0ElNUIlMjIlMjVUT1RBTCUyNSUyMiUyQyUyMkxBTkQwMDAlMjIlMkMlMjJBVVNMQU5EJTIyJTVEJTJDJTIyY2hpbGRyZW4lMjIlM0ElNUIlNUQlMkMlMjJzaG93QXNJbnRlcmxpbmUlMjIlM0FmYWxzZSUyQyUyMnNob3dWYXJpYWJsZSUyMiUzQXRydWUlMkMlMjJzaG93VmFyaWFibGVWYWx1ZSUyMiUzQSU1QiUyMkxBQkVMJTIyJTVEJTJDJTIyaXNIaWRkZW4lMjIlM0FmYWxzZSUyQyUyMmJsb2NrQ29kZSUyMiUzQSUyMnYxMiUyMiUyQyUyMnBvc3NpYmxlUGxhY2VzJTIyJTNBJTVCJTdCJTIycHJldlBhcmVudCUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnY5JTIyJTJDJTIyaWQlMjIlM0ElMjJyb3dUaXRsZS4wLjAlMjIlN0QlMkMlMjJuZXdQYXJlbnQlMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MSUyMiUyQyUyMmlkJTIyJTNBJTIycm93VGl0bGUuMCUyMiU3RCUyQyUyMmVsZW1lbnRBYm92ZSUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnYxJTIyJTJDJTIyaWQlMjIlM0ElMjJyb3dUaXRsZS4wJTIyJTdEJTJDJTIyZWxlbWVudEJlbG93JTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIydjklMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAuMCUyMiU3RCUyQyUyMm5ld1NpYmxpbmdJbmRleCUyMiUzQTAlMkMlMjJoYXNUcmFuc3Bvc2VQYXJ0JTIyJTNBZmFsc2UlN0QlMkMlN0IlMjJwcmV2UGFyZW50JTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIydjklMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAuMCUyMiU3RCUyQyUyMmVsZW1lbnRBYm92ZSUyMiUzQW51bGwlMkMlMjJlbGVtZW50QmVsb3clMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MSUyMiUyQyUyMmlkJTIyJTNBJTIycm93VGl0bGUuMCUyMiU3RCUyQyUyMm5ld1NpYmxpbmdJbmRleCUyMiUzQTAlMkMlMjJoYXNUcmFuc3Bvc2VQYXJ0JTIyJTNBZmFsc2UlN0QlMkMlN0IlMjJwcmV2UGFyZW50JTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIydjklMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAuMCUyMiU3RCUyQyUyMmVsZW1lbnRBYm92ZSUyMiUzQW51bGwlMkMlMjJlbGVtZW50QmVsb3clMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MiUyMiUyQyUyMmlkJTIyJTNBJTIyY29sVGl0bGUuMCUyMiU3RCUyQyUyMm5ld1NpYmxpbmdJbmRleCUyMiUzQTAlMkMlMjJoYXNUcmFuc3Bvc2VQYXJ0JTIyJTNBdHJ1ZSU3RCU1RCU3RCU1RCUyQyUyMnNob3dBc0ludGVybGluZSUyMiUzQWZhbHNlJTJDJTIyc2hvd1ZhcmlhYmxlJTIyJTNBdHJ1ZSUyQyUyMnNob3dWYXJpYWJsZVZhbHVlJTIyJTNBJTVCJTIyTEFCRUwlMjIlNUQlMkMlMjJpc0hpZGRlbiUyMiUzQWZhbHNlJTJDJTIyYmxvY2tDb2RlJTIyJTNBJTIydjklMjIlMkMlMjJwb3NzaWJsZVBsYWNlcyUyMiUzQSU1QiU3QiUyMnByZXZQYXJlbnQlMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MSUyMiUyQyUyMmlkJTIyJTNBJTIycm93VGl0bGUuMCUyMiU3RCUyQyUyMmVsZW1lbnRBYm92ZSUyMiUzQW51bGwlMkMlMjJlbGVtZW50QmVsb3clMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MSUyMiUyQyUyMmlkJTIyJTNBJTIycm93VGl0bGUuMCUyMiU3RCUyQyUyMm5ld1NpYmxpbmdJbmRleCUyMiUzQTAlMkMlMjJoYXNUcmFuc3Bvc2VQYXJ0JTIyJTNBZmFsc2UlN0QlMkMlN0IlMjJwcmV2UGFyZW50JTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIydjElMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAlMjIlN0QlMkMlMjJuZXdQYXJlbnQlMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MTIlMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAuMC4wJTIyJTdEJTJDJTIyZWxlbWVudEFib3ZlJTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIydjEyJTIyJTJDJTIyaWQlMjIlM0ElMjJyb3dUaXRsZS4wLjAuMCUyMiU3RCUyQyUyMmVsZW1lbnRCZWxvdyUyMiUzQW51bGwlMkMlMjJuZXdTaWJsaW5nSW5kZXglMjIlM0EwJTJDJTIyaGFzVHJhbnNwb3NlUGFydCUyMiUzQWZhbHNlJTdEJTJDJTdCJTIycHJldlBhcmVudCUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnYxJTIyJTJDJTIyaWQlMjIlM0ElMjJyb3dUaXRsZS4wJTIyJTdEJTJDJTIyZWxlbWVudEFib3ZlJTIyJTNBbnVsbCUyQyUyMmVsZW1lbnRCZWxvdyUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnYyJTIyJTJDJTIyaWQlMjIlM0ElMjJjb2xUaXRsZS4wJTIyJTdEJTJDJTIybmV3U2libGluZ0luZGV4JTIyJTNBMCUyQyUyMmhhc1RyYW5zcG9zZVBhcnQlMjIlM0F0cnVlJTdEJTVEJTdEJTVEJTJDJTIyc2hvd0FzSW50ZXJsaW5lJTIyJTNBdHJ1ZSUyQyUyMnNob3dWYXJpYWJsZSUyMiUzQWZhbHNlJTJDJTIyc2hvd1ZhcmlhYmxlVmFsdWUlMjIlM0ElNUIlMjJMQUJFTCUyMiU1RCUyQyUyMmlzSGlkZGVuJTIyJTNBZmFsc2UlMkMlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MSUyMiUyQyUyMnBvc3NpYmxlUGxhY2VzJTIyJTNBJTVCJTdCJTIybmV3UGFyZW50JTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIydjklMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAuMCUyMiU3RCUyQyUyMmVsZW1lbnRBYm92ZSUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnY5JTIyJTJDJTIyaWQlMjIlM0ElMjJyb3dUaXRsZS4wLjAlMjIlN0QlMkMlMjJlbGVtZW50QmVsb3clMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MTIlMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAuMC4wJTIyJTdEJTJDJTIybmV3U2libGluZ0luZGV4JTIyJTNBMCUyQyUyMmhhc1RyYW5zcG9zZVBhcnQlMjIlM0FmYWxzZSU3RCUyQyU3QiUyMm5ld1BhcmVudCUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnYxMiUyMiUyQyUyMmlkJTIyJTNBJTIycm93VGl0bGUuMC4wLjAlMjIlN0QlMkMlMjJlbGVtZW50QWJvdmUlMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MTIlMjIlMkMlMjJpZCUyMiUzQSUyMnJvd1RpdGxlLjAuMC4wJTIyJTdEJTJDJTIyZWxlbWVudEJlbG93JTIyJTNBbnVsbCUyQyUyMm5ld1NpYmxpbmdJbmRleCUyMiUzQTAlMkMlMjJoYXNUcmFuc3Bvc2VQYXJ0JTIyJTNBZmFsc2UlN0QlMkMlN0IlMjJlbGVtZW50QWJvdmUlMjIlM0FudWxsJTJDJTIyZWxlbWVudEJlbG93JTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIydjIlMjIlMkMlMjJpZCUyMiUzQSUyMmNvbFRpdGxlLjAlMjIlN0QlMkMlMjJuZXdTaWJsaW5nSW5kZXglMjIlM0EwJTJDJTIyaGFzVHJhbnNwb3NlUGFydCUyMiUzQXRydWUlN0QlNUQlN0QlNUQlMkMlMjJjb2x1bW5IZWFkZXIlMjIlM0ElNUIlN0IlMjJ2YXJpYWJsZUlkJTIyJTNBJTIyR0VPREwxJTIyJTJDJTIyaWQlMjIlM0ElMjJjb2xUaXRsZS4wJTIyJTJDJTIydmFsdWVzSWRzJTIyJTNBJTVCJTIyREclMjIlNUQlMkMlMjJjaGlsZHJlbiUyMiUzQSU1QiU3QiUyMnZhcmlhYmxlSWQlMjIlM0ElMjJQUlMwMDElMjIlMkMlMjJpZCUyMiUzQSUyMmNvbFRpdGxlLjAuMCUyMiUyQyUyMnZhbHVlc0lkcyUyMiUzQSU1QiUyMlFNVSUyMiU1RCUyQyUyMmNoaWxkcmVuJTIyJTNBJTVCJTVEJTJDJTIyc2hvd0FzSW50ZXJsaW5lJTIyJTNBZmFsc2UlMkMlMjJpc0hpZGRlbiUyMiUzQWZhbHNlJTJDJTIyYmxvY2tDb2RlJTIyJTNBJTIyYzElMjIlMkMlMjJwb3NzaWJsZVBsYWNlcyUyMiUzQSU1QiU3QiUyMnByZXZQYXJlbnQlMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MiUyMiUyQyUyMmlkJTIyJTNBJTIyY29sVGl0bGUuMCUyMiU3RCUyQyUyMmVsZW1lbnRBYm92ZSUyMiUzQW51bGwlMkMlMjJlbGVtZW50QmVsb3clMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJ2MiUyMiUyQyUyMmlkJTIyJTNBJTIyY29sVGl0bGUuMCUyMiU3RCUyQyUyMm5ld1NpYmxpbmdJbmRleCUyMiUzQTAlMkMlMjJoYXNUcmFuc3Bvc2VQYXJ0JTIyJTNBZmFsc2UlN0QlNUQlN0QlNUQlMkMlMjJzaG93QXNJbnRlcmxpbmUlMjIlM0FmYWxzZSUyQyUyMnNob3dWYXJpYWJsZSUyMiUzQWZhbHNlJTJDJTIyc2hvd1ZhcmlhYmxlVmFsdWUlMjIlM0ElNUIlMjJMQUJFTCUyMiU1RCUyQyUyMnNvcnQlMjIlM0ElMjJDb2RlQXNjJTIyJTJDJTIyaXNIaWRkZW4lMjIlM0FmYWxzZSUyQyUyMmJsb2NrQ29kZSUyMiUzQSUyMnYyJTIyJTJDJTIycG9zc2libGVQbGFjZXMlMjIlM0ElNUIlN0IlMjJuZXdQYXJlbnQlMjIlM0ElN0IlMjJibG9ja0NvZGUlMjIlM0ElMjJjMSUyMiUyQyUyMmlkJTIyJTNBJTIyY29sVGl0bGUuMC4wJTIyJTdEJTJDJTIyZWxlbWVudEFib3ZlJTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIyYzElMjIlMkMlMjJpZCUyMiUzQSUyMmNvbFRpdGxlLjAuMCUyMiU3RCUyQyUyMmVsZW1lbnRCZWxvdyUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnY2JTIyJTJDJTIyaWQlMjIlM0ElMjJjb2xUaXRsZS4xJTIyJTdEJTJDJTIybmV3U2libGluZ0luZGV4JTIyJTNBMCUyQyUyMmhhc1RyYW5zcG9zZVBhcnQlMjIlM0FmYWxzZSU3RCU1RCU3RCUyQyU3QiUyMnZhcmlhYmxlSWQlMjIlM0ElMjJHRU9MSzQlMjIlMkMlMjJpZCUyMiUzQSUyMmNvbFRpdGxlLjElMjIlMkMlMjJ2YWx1ZXNJZHMlMjIlM0ElNUIlMjIwMTAwMSUyMiUyQyUyMjAxMDAyJTIyJTJDJTIyMDEwMDMlMjIlMkMlMjIwMTAwNCUyMiUyQyUyMjAxMDUxJTIyJTJDJTIyMDEwNTMlMjIlMkMlMjIwMTA1NCUyMiUyQyUyMjAxMDU1JTIyJTJDJTIyMDEwNTYlMjIlMkMlMjIwMTA1NyUyMiUyQyUyMjAxMDU4JTIyJTJDJTIyMDEwNTklMjIlMkMlMjIwMTA2MCUyMiUyQyUyMjAxMDYxJTIyJTJDJTIyMDEwNjIlMjIlMkMlMjIwMjAwMCUyMiUyQyUyMjAzMTAxJTIyJTJDJTIyMDMxMDIlMjIlMkMlMjIwMzEwMyUyMiUyQyUyMjAzMTUxJTIyJTJDJTIyMDMxNTMlMjIlMkMlMjIwMzE1NCUyMiUyQyUyMjAzMTU1JTIyJTJDJTIyMDMxNTclMjIlMkMlMjIwMzE1OCUyMiUyQyUyMjAzMTU5JTIyJTJDJTIyMDMyNDElMjIlMkMlMjIwMzI1MSUyMiUyQyUyMjAzMjUyJTIyJTJDJTIyMDMyNTQlMjIlMkMlMjIwMzI1NSUyMiUyQyUyMjAzMjU2JTIyJTJDJTIyMDMyNTclMjIlMkMlMjIwMzM1MSUyMiUyQyUyMjAzMzUyJTIyJTJDJTIyMDMzNTMlMjIlMkMlMjIwMzM1NCUyMiUyQyUyMjAzMzU1JTIyJTJDJTIyMDMzNTYlMjIlMkMlMjIwMzM1NyUyMiUyQyUyMjAzMzU4JTIyJTJDJTIyMDMzNTklMjIlMkMlMjIwMzM2MCUyMiUyQyUyMjAzMzYxJTIyJTJDJTIyMDM0MDElMjIlMkMlMjIwMzQwMiUyMiUyQyUyMjAzNDAzJTIyJTJDJTIyMDM0MDQlMjIlMkMlMjIwMzQwNSUyMiUyQyUyMjAzNDUxJTIyJTJDJTIyMDM0NTIlMjIlMkMlMjIwMzQ1MyUyMiUyQyUyMjAzNDU0JTIyJTJDJTIyMDM0NTUlMjIlMkMlMjIwMzQ1NiUyMiUyQyUyMjAzNDU3JTIyJTJDJTIyMDM0NTglMjIlMkMlMjIwMzQ1OSUyMiUyQyUyMjAzNDYwJTIyJTJDJTIyMDM0NjElMjIlMkMlMjIwMzQ2MiUyMiUyQyUyMjA0MDExJTIyJTJDJTIyMDQwMTIlMjIlMkMlMjIwNTExMSUyMiUyQyUyMjA1MTEyJTIyJTJDJTIyMDUxMTMlMjIlMkMlMjIwNTExNCUyMiUyQyUyMjA1MTE2JTIyJTJDJTIyMDUxMTclMjIlMkMlMjIwNTExOSUyMiUyQyUyMjA1MTIwJTIyJTJDJTIyMDUxMjIlMjIlMkMlMjIwNTEyNCUyMiUyQyUyMjA1MTU0JTIyJTJDJTIyMDUxNTglMjIlMkMlMjIwNTE2MiUyMiUyQyUyMjA1MTY2JTIyJTJDJTIyMDUxNzAlMjIlMkMlMjIwNTMxNCUyMiUyQyUyMjA1MzE1JTIyJTJDJTIyMDUzMTYlMjIlMkMlMjIwNTMzNCUyMiUyQyUyMjA1MzU4JTIyJTJDJTIyMDUzNjIlMjIlMkMlMjIwNTM2NiUyMiUyQyUyMjA1MzcwJTIyJTJDJTIyMDUzNzQlMjIlMkMlMjIwNTM3OCUyMiUyQyUyMjA1MzgyJTIyJTJDJTIyMDU1MTIlMjIlMkMlMjIwNTUxMyUyMiUyQyUyMjA1NTE1JTIyJTJDJTIyMDU1NTQlMjIlMkMlMjIwNTU1OCUyMiUyQyUyMjA1NTYyJTIyJTJDJTIyMDU1NjYlMjIlMkMlMjIwNTU3MCUyMiUyQyUyMjA1NzExJTIyJTJDJTIyMDU3NTQlMjIlMkMlMjIwNTc1OCUyMiUyQyUyMjA1NzYyJTIyJTJDJTIyMDU3NjYlMjIlMkMlMjIwNTc3MCUyMiUyQyUyMjA1Nzc0JTIyJTJDJTIyMDU5MTElMjIlMkMlMjIwNTkxMyUyMiUyQyUyMjA1OTE0JTIyJTJDJTIyMDU5MTUlMjIlMkMlMjIwNTkxNiUyMiUyQyUyMjA1OTU0JTIyJTJDJTIyMDU5NTglMjIlMkMlMjIwNTk2MiUyMiUyQyUyMjA1OTY2JTIyJTJDJTIyMDU5NzAlMjIlMkMlMjIwNTk3NCUyMiUyQyUyMjA1OTc4JTIyJTJDJTIyMDY0MTElMjIlMkMlMjIwNjQxMiUyMiUyQyUyMjA2NDEzJTIyJTJDJTIyMDY0MTQlMjIlMkMlMjIwNjQzMSUyMiUyQyUyMjA2NDMyJTIyJTJDJTIyMDY0MzMlMjIlMkMlMjIwNjQzNCUyMiUyQyUyMjA2NDM1JTIyJTJDJTIyMDY0MzYlMjIlMkMlMjIwNjQzNyUyMiUyQyUyMjA2NDM4JTIyJTJDJTIyMDY0MzklMjIlMkMlMjIwNjQ0MCUyMiUyQyUyMjA2NTMxJTIyJTJDJTIyMDY1MzIlMjIlMkMlMjIwNjUzMyUyMiUyQyUyMjA2NTM0JTIyJTJDJTIyMDY1MzUlMjIlMkMlMjIwNjYxMSUyMiUyQyUyMjA2NjMxJTIyJTJDJTIyMDY2MzIlMjIlMkMlMjIwNjYzMyUyMiUyQyUyMjA2NjM0JTIyJTJDJTIyMDY2MzUlMjIlMkMlMjIwNjYzNiUyMiUyQyUyMjA3MTExJTIyJTJDJTIyMDcxMzElMjIlMkMlMjIwNzEzMiUyMiUyQyUyMjA3MTMzJTIyJTJDJTIyMDcxMzQlMjIlMkMlMjIwNzEzNSUyMiUyQyUyMjA3MTM3JTIyJTJDJTIyMDcxMzglMjIlMkMlMjIwNzE0MCUyMiUyQyUyMjA3MTQxJTIyJTJDJTIyMDcxNDMlMjIlMkMlMjIwNzIxMSUyMiUyQyUyMjA3MjMxJTIyJTJDJTIyMDcyMzIlMjIlMkMlMjIwNzIzMyUyMiUyQyUyMjA3MjM1JTIyJTJDJTIyMDczMTElMjIlMkMlMjIwNzMxMiUyMiUyQyUyMjA3MzEzJTIyJTJDJTIyMDczMTQlMjIlMkMlMjIwNzMxNSUyMiUyQyUyMjA3MzE2JTIyJTJDJTIyMDczMTclMjIlMkMlMjIwNzMxOCUyMiUyQyUyMjA3MzE5JTIyJTJDJTIyMDczMjAlMjIlMkMlMjIwNzMzMSUyMiUyQyUyMjA3MzMyJTIyJTJDJTIyMDczMzMlMjIlMkMlMjIwNzMzNCUyMiUyQyUyMjA3MzM1JTIyJTJDJTIyMDczMzYlMjIlMkMlMjIwNzMzNyUyMiUyQyUyMjA3MzM4JTIyJTJDJTIyMDczMzklMjIlMkMlMjIwNzM0MCUyMiUyQyUyMjA4MTExJTIyJTJDJTIyMDgxMTUlMjIlMkMlMjIwODExNiUyMiUyQyUyMjA4MTE3JTIyJTJDJTIyMDgxMTglMjIlMkMlMjIwODExOSUyMiUyQyUyMjA4MTIxJTIyJTJDJTIyMDgxMjUlMjIlMkMlMjIwODEyNiUyMiUyQyUyMjA4MTI3JTIyJTJDJTIyMDgxMjglMjIlMkMlMjIwODEzNSUyMiUyQyUyMjA4MTM2JTIyJTJDJTIyMDgyMTElMjIlMkMlMjIwODIxMiUyMiUyQyUyMjA4MjE1JTIyJTJDJTIyMDgyMTYlMjIlMkMlMjIwODIyMSUyMiUyQyUyMjA4MjIyJTIyJTJDJTIyMDgyMjUlMjIlMkMlMjIwODIyNiUyMiUyQyUyMjA4MjMxJTIyJTJDJTIyMDgyMzUlMjIlMkMlMjIwODIzNiUyMiUyQyUyMjA4MjM3JTIyJTJDJTIyMDgzMTElMjIlMkMlMjIwODMxNSUyMiUyQyUyMjA4MzE2JTIyJTJDJTIyMDgzMTclMjIlMkMlMjIwODMyNSUyMiUyQyUyMjA4MzI2JTIyJTJDJTIyMDgzMjclMjIlMkMlMjIwODMzNSUyMiUyQyUyMjA4MzM2JTIyJTJDJTIyMDgzMzclMjIlMkMlMjIwODQxNSUyMiUyQyUyMjA4NDE2JTIyJTJDJTIyMDg0MTclMjIlMkMlMjIwODQyMSUyMiUyQyUyMjA4NDI1JTIyJTJDJTIyMDg0MjYlMjIlMkMlMjIwODQzNSUyMiUyQyUyMjA4NDM2JTIyJTJDJTIyMDg0MzclMjIlMkMlMjIwOTE2MSUyMiUyQyUyMjA5MTYyJTIyJTJDJTIyMDkxNjMlMjIlMkMlMjIwOTE3MSUyMiUyQyUyMjA5MTcyJTIyJTJDJTIyMDkxNzMlMjIlMkMlMjIwOTE3NCUyMiUyQyUyMjA5MTc1JTIyJTJDJTIyMDkxNzYlMjIlMkMlMjIwOTE3NyUyMiUyQyUyMjA5MTc4JTIyJTJDJTIyMDkxNzklMjIlMkMlMjIwOTE4MCUyMiUyQyUyMjA5MTgxJTIyJTJDJTIyMDkxODIlMjIlMkMlMjIwOTE4MyUyMiUyQyUyMjA5MTg0JTIyJTJDJTIyMDkxODUlMjIlMkMlMjIwOTE4NiUyMiUyQyUyMjA5MTg3JTIyJTJDJTIyMDkxODglMjIlMkMlMjIwOTE4OSUyMiUyQyUyMjA5MTkwJTIyJTJDJTIyMDkyNjElMjIlMkMlMjIwOTI2MiUyMiUyQyUyMjA5MjYzJTIyJTJDJTIyMDkyNzElMjIlMkMlMjIwOTI3MiUyMiUyQyUyMjA5MjczJTIyJTJDJTIyMDkyNzQlMjIlMkMlMjIwOTI3NSUyMiUyQyUyMjA5Mjc2JTIyJTJDJTIyMDkyNzclMjIlMkMlMjIwOTI3OCUyMiUyQyUyMjA5Mjc5JTIyJTJDJTIyMDkzNjElMjIlMkMlMjIwOTM2MiUyMiUyQyUyMjA5MzYzJTIyJTJDJTIyMDkzNzElMjIlMkMlMjIwOTM3MiUyMiUyQyUyMjA5MzczJTIyJTJDJTIyMDkzNzQlMjIlMkMlMjIwOTM3NSUyMiUyQyUyMjA5Mzc2JTIyJTJDJTIyMDkzNzclMjIlMkMlMjIwOTQ2MSUyMiUyQyUyMjA5NDYyJTIyJTJDJTIyMDk0NjMlMjIlMkMlMjIwOTQ2NCUyMiUyQyUyMjA5NDcxJTIyJTJDJTIyMDk0NzIlMjIlMkMlMjIwOTQ3MyUyMiUyQyUyMjA5NDc0JTIyJTJDJTIyMDk0NzUlMjIlMkMlMjIwOTQ3NiUyMiUyQyUyMjA5NDc3JTIyJTJDJTIyMDk0NzglMjIlMkMlMjIwOTQ3OSUyMiUyQyUyMjA5NTYxJTIyJTJDJTIyMDk1NjIlMjIlMkMlMjIwOTU2MyUyMiUyQyUyMjA5NTY0JTIyJTJDJTIyMDk1NjUlMjIlMkMlMjIwOTU3MSUyMiUyQyUyMjA5NTcyJTIyJTJDJTIyMDk1NzMlMjIlMkMlMjIwOTU3NCUyMiUyQyUyMjA5NTc1JTIyJTJDJTIyMDk1NzYlMjIlMkMlMjIwOTU3NyUyMiUyQyUyMjA5NjYxJTIyJTJDJTIyMDk2NjIlMjIlMkMlMjIwOTY2MyUyMiUyQyUyMjA5NjcxJTIyJTJDJTIyMDk2NzIlMjIlMkMlMjIwOTY3MyUyMiUyQyUyMjA5Njc0JTIyJTJDJTIyMDk2NzUlMjIlMkMlMjIwOTY3NiUyMiUyQyUyMjA5Njc3JTIyJTJDJTIyMDk2NzglMjIlMkMlMjIwOTY3OSUyMiUyQyUyMjA5NzYxJTIyJTJDJTIyMDk3NjIlMjIlMkMlMjIwOTc2MyUyMiUyQyUyMjA5NzY0JTIyJTJDJTIyMDk3NzElMjIlMkMlMjIwOTc3MiUyMiUyQyUyMjA5NzczJTIyJTJDJTIyMDk3NzQlMjIlMkMlMjIwOTc3NSUyMiUyQyUyMjA5Nzc2JTIyJTJDJTIyMDk3NzclMjIlMkMlMjIwOTc3OCUyMiUyQyUyMjA5Nzc5JTIyJTJDJTIyMDk3ODAlMjIlMkMlMjIxMDA0MSUyMiUyQyUyMjEwMDQyJTIyJTJDJTIyMTAwNDMlMjIlMkMlMjIxMDA0NCUyMiUyQyUyMjEwMDQ1JTIyJTJDJTIyMTAwNDYlMjIlMkMlMjIxMTAwMCUyMiUyQyUyMjEyMDUxJTIyJTJDJTIyMTIwNTIlMjIlMkMlMjIxMjA1MyUyMiUyQyUyMjEyMDU0JTIyJTJDJTIyMTIwNjAlMjIlMkMlMjIxMjA2MSUyMiUyQyUyMjEyMDYyJTIyJTJDJTIyMTIwNjMlMjIlMkMlMjIxMjA2NCUyMiUyQyUyMjEyMDY1JTIyJTJDJTIyMTIwNjYlMjIlMkMlMjIxMjA2NyUyMiUyQyUyMjEyMDY4JTIyJTJDJTIyMTIwNjklMjIlMkMlMjIxMjA3MCUyMiUyQyUyMjEyMDcxJTIyJTJDJTIyMTIwNzIlMjIlMkMlMjIxMjA3MyUyMiUyQyUyMjEzMDAzJTIyJTJDJTIyMTMwMDQlMjIlMkMlMjIxMzA3MSUyMiUyQyUyMjEzMDcyJTIyJTJDJTIyMTMwNzMlMjIlMkMlMjIxMzA3NCUyMiUyQyUyMjEzMDc1JTIyJTJDJTIyMTMwNzYlMjIlMkMlMjIxNDUxMSUyMiUyQyUyMjE0NTIxJTIyJTJDJTIyMTQ1MjIlMjIlMkMlMjIxNDUyMyUyMiUyQyUyMjE0NTI0JTIyJTJDJTIyMTQ2MTIlMjIlMkMlMjIxNDYyNSUyMiUyQyUyMjE0NjI2JTIyJTJDJTIyMTQ2MjclMjIlMkMlMjIxNDYyOCUyMiUyQyUyMjE0NzEzJTIyJTJDJTIyMTQ3MjklMjIlMkMlMjIxNDczMCUyMiUyQyUyMjE1MDAxJTIyJTJDJTIyMTUwMDIlMjIlMkMlMjIxNTAwMyUyMiUyQyUyMjE1MDgxJTIyJTJDJTIyMTUwODIlMjIlMkMlMjIxNTA4MyUyMiUyQyUyMjE1MDg0JTIyJTJDJTIyMTUwODUlMjIlMkMlMjIxNTA4NiUyMiUyQyUyMjE1MDg3JTIyJTJDJTIyMTUwODglMjIlMkMlMjIxNTA4OSUyMiUyQyUyMjE1MDkwJTIyJTJDJTIyMTUwOTElMjIlMkMlMjIxNjA1MSUyMiUyQyUyMjE2MDUyJTIyJTJDJTIyMTYwNTMlMjIlMkMlMjIxNjA1NCUyMiUyQyUyMjE2MDU1JTIyJTJDJTIyMTYwNjElMjIlMkMlMjIxNjA2MiUyMiUyQyUyMjE2MDYzJTIyJTJDJTIyMTYwNjQlMjIlMkMlMjIxNjA2NSUyMiUyQyUyMjE2MDY2JTIyJTJDJTIyMTYwNjclMjIlMkMlMjIxNjA2OCUyMiUyQyUyMjE2MDY5JTIyJTJDJTIyMTYwNzAlMjIlMkMlMjIxNjA3MSUyMiUyQyUyMjE2MDcyJTIyJTJDJTIyMTYwNzMlMjIlMkMlMjIxNjA3NCUyMiUyQyUyMjE2MDc1JTIyJTJDJTIyMTYwNzYlMjIlMkMlMjIxNjA3NyUyMiU1RCUyQyUyMmNoaWxkcmVuJTIyJTNBJTVCJTdCJTIydmFyaWFibGVJZCUyMiUzQSUyMlBSUzAxOCUyMiUyQyUyMmlkJTIyJTNBJTIyY29sVGl0bGUuMS4wJTIyJTJDJTIydmFsdWVzSWRzJTIyJTNBJTVCJTIyUU1VJTIyJTVEJTJDJTIyY2hpbGRyZW4lMjIlM0ElNUIlNUQlMkMlMjJzaG93QXNJbnRlcmxpbmUlMjIlM0FmYWxzZSUyQyUyMmlzSGlkZGVuJTIyJTNBZmFsc2UlMkMlMjJibG9ja0NvZGUlMjIlM0ElMjJjMiUyMiUyQyUyMnBvc3NpYmxlUGxhY2VzJTIyJTNBJTVCJTdCJTIycHJldlBhcmVudCUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnY2JTIyJTJDJTIyaWQlMjIlM0ElMjJjb2xUaXRsZS4xJTIyJTdEJTJDJTIyZWxlbWVudEFib3ZlJTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIyYzElMjIlMkMlMjJpZCUyMiUzQSUyMmNvbFRpdGxlLjAuMCUyMiU3RCUyQyUyMmVsZW1lbnRCZWxvdyUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMnY2JTIyJTJDJTIyaWQlMjIlM0ElMjJjb2xUaXRsZS4xJTIyJTdEJTJDJTIybmV3U2libGluZ0luZGV4JTIyJTNBMSUyQyUyMmhhc1RyYW5zcG9zZVBhcnQlMjIlM0FmYWxzZSU3RCU1RCU3RCU1RCUyQyUyMnNob3dBc0ludGVybGluZSUyMiUzQWZhbHNlJTJDJTIyc2hvd1ZhcmlhYmxlJTIyJTNBZmFsc2UlMkMlMjJzaG93VmFyaWFibGVWYWx1ZSUyMiUzQSU1QiUyMklEJTIyJTJDJTIyTEFCRUwlMjIlNUQlMkMlMjJzb3J0JTIyJTNBJTIyQ29kZUFzYyUyMiUyQyUyMmlzSGlkZGVuJTIyJTNBZmFsc2UlMkMlMjJibG9ja0NvZGUlMjIlM0ElMjJ2NiUyMiUyQyUyMnBvc3NpYmxlUGxhY2VzJTIyJTNBJTVCJTdCJTIybmV3UGFyZW50JTIyJTNBJTdCJTIyYmxvY2tDb2RlJTIyJTNBJTIyYzIlMjIlMkMlMjJpZCUyMiUzQSUyMmNvbFRpdGxlLjEuMCUyMiU3RCUyQyUyMmVsZW1lbnRBYm92ZSUyMiUzQSU3QiUyMmJsb2NrQ29kZSUyMiUzQSUyMmMyJTIyJTJDJTIyaWQlMjIlM0ElMjJjb2xUaXRsZS4xLjAlMjIlN0QlMkMlMjJlbGVtZW50QmVsb3clMjIlM0FudWxsJTJDJTIybmV3U2libGluZ0luZGV4JTIyJTNBMCUyQyUyMmhhc1RyYW5zcG9zZVBhcnQlMjIlM0FmYWxzZSU3RCU1RCU3RCU1RCUyQyUyMmZpeEZpcnN0Q29sdW1ucyUyMiUzQWZhbHNlJTdE
+
 main <- function() {
 
-  df_age_raw <- readxl::read_xlsx(
-    here(
-    "01_data",
-    "raw",
-    "german",
-    "foreign",
-    "age.xlsx")
-  )
+  df_age_raw <- read_age_raw()
 
-  df_age <- clean_age(df_age_raw) |>
-    remove_unavailable_counties()
+  df_age <- df_age_raw |>
+    clean_age_11_22() |>
+    adjust_county_id() |>
+    summarise_population() |>
+    remove_unavailable_counties() 
 
-  df_cor_raw <- readxl::read_xlsx(here("01_data", "intermediate", "german", "nuts_correspondence.xlsx"))
-
-  df_cor <- df_cor_raw |>
-    select_cor_data()
+  df_cor <- readxl::read_xlsx(here("01_data", "intermediate", "german", "nuts_correspondence.xlsx")) |>
+    select(county_id, city_name )
 
   df_age_master <- merge_age_cor(df_age, df_cor)
 
@@ -27,41 +23,90 @@ main <- function() {
 }
 
 
-clean_age <- function(df_age_raw) {
 
-  df_output <- df_age_raw |>
+read_age_raw <- function() {
+
+  readxl::read_xlsx(
+    here("01_data", "raw", "german", "foreign", "1000A-2010_en (2).xlsx"),
+    skip = 2
+  )
+}
+
+
+clean_age_11_22 <- function(df_raw) {
+
+  df <- df_raw |>
+    janitor::clean_names() |> 
     select(
-      category = 1,
-      county_id = 2,
-      county_name = 3,
-      y25_29 = 6,
-      y30_34 = 8,
-      y35_39 = 10,
-      y40_44 = 12,
-      y45_49 = 14,
-      y50_54 = 16,
-      y55_59 = 18,
-      y60_64 = 20
-    ) |> 
-    fill(category, .direction = "down") |> 
-    mutate(
-      across(-c(category, county_name), as.numeric)
+      year = 1,
+      age_category = 3,
+      is_foreign = 4,
+      seq(5, 805, 2)
     ) |>
-    dplyr::filter(!is.na(county_id)) |> 
+    fill(c(age_category, year), .direction = "down") |>  
+    dplyr::filter(
+      is_foreign == "Foreign country and Other",
+    ) |> 
+    # remove is_foreign because I already filtered it
+    select(-is_foreign) |> 
     pivot_longer(
-      cols = -c(category, county_id, county_name),
-      names_to = "age",
-      values_to = "value"
-    ) |>  
-    summarise(
-      y25_64 = sum(value, na.rm = TRUE),
-      # .by = c(category, county_id)
-      .by = c(category, county_id, county_name)
+      cols = -c(year, age_category),
+      names_to = "county_id",
+      values_to = "population"
     ) |> 
-    pivot_wider(
-      names_from = category,
-      values_from = y25_64
+    mutate(
+      county_id = str_sub(county_id, start = 2, end = 6),
+      county_id = as.numeric(county_id),
+      population = as.numeric(population),
+      year = lubridate::year(year)
+    ) |>
+    dplyr::filter(!is.na(county_id)) |>
+    mutate(
+      age_category = case_when(
+        str_detect(age_category, "Under 5") ~ "y5_under",
+        str_detect(age_category, "5 to 9") ~ "y5_9", 
+        str_detect(age_category, "10 to 14") ~ "y10_14",
+        str_detect(age_category, "15 to 19") ~ "y15_19",
+        str_detect(age_category, "20 to 24") ~ "y20_24",
+        str_detect(age_category, "25 to 29") ~ "y25_29",
+        str_detect(age_category, "30 to 34") ~ "y30_34",
+        str_detect(age_category, "35 to 39") ~ "y35_39",
+        str_detect(age_category, "40 to 44") ~ "y40_44",
+        str_detect(age_category, "45 to 49") ~ "y45_49",
+        str_detect(age_category, "50 to 54") ~ "y50_54",
+        str_detect(age_category, "55 to 59") ~ "y55_59",
+        str_detect(age_category, "60 to 64") ~ "y60_64",
+        str_detect(age_category, "65 to 69") ~ "y65_69",
+        str_detect(age_category, "70 to 74") ~ "y70_74",
+        str_detect(age_category, "75 to 79") ~ "y75_79",
+        str_detect(age_category, "80 to 84") ~ "y80_84",
+        str_detect(age_category, "85 to 89") ~ "y85_89",
+        str_detect(age_category, "90 years and over") ~ "y90_over",
+        # age_category == "25-29 years" ~ "y25_29",
+        TRUE ~ NA_character_
+      )
     ) |> 
+    dplyr::filter(!is.na(age_category))
+
+  return(df)
+}
+
+
+filter_year_over25 <- function(df) {
+
+  df |>
+    dplyr::filter(
+      age_category %in% c(
+        "y25_29", "y30_34", "y35_39", "y40_44",
+        "y45_49", "y50_54", "y55_59", "y60_64"
+      )
+    )
+}
+
+
+adjust_county_id <- function(df) {
+
+  df |>
     mutate(
       county_id = case_when(
         # Mecklenburg-Vorpommern
@@ -79,21 +124,28 @@ clean_age <- function(df_age_raw) {
         county_id %in% c(16056, 16063) ~ 16063,
         .default = county_id
         )
-    ) |> 
-    summarise(
-      y25_total = sum(Total, na.rm = TRUE),
-      y25_native = sum(Germany, na.rm = TRUE),
-      y25_foreign = sum(Abroad, na.rm = TRUE),
-      .by = county_id
     ) 
-}
+    
+  }
 
+
+summarise_population <- function(df) {
+
+  df |>
+    summarise(
+      y25_64 = sum(population, na.rm = TRUE),
+      # .by = c(category, county_id)
+      .by = c(year, county_id)
+    )
+
+}
+ 
 
 remove_unavailable_counties <- function(df) {
 
   # Not available on Foreigner's data
   # Description below
-  df <- df |>
+  df |>
   dplyr::filter(
     !county_id %in% c(
       # Saarland
@@ -120,25 +172,16 @@ remove_unavailable_counties <- function(df) {
 }
 
 
-select_cor_data <- function(df_cor_raw) {
-
-  df_output <- df_cor_raw |> 
-    select(
-      county_id,
-      city_name 
-    )
-}
-
-
 merge_age_cor <- function(df_age, df_cor) {
 
   # merge data
   df_age_master <- df_age |>
     left_join(df_cor, by = "county_id") |>
     summarise(
-      y25_total = sum(y25_total, na.rm = TRUE),
-      y25_foreign = sum(y25_foreign, na.rm = TRUE),
-      y25_native = sum(y25_native, na.rm = TRUE),
-      .by = city_name
+      # y25_total = sum(y25_total, na.rm = TRUE),
+      y25_64 = sum(y25_64, na.rm = TRUE),
+      # y25_native = sum(y25_native, na.rm = TRUE),
+      .by = c(city_name, year)
     )
 }
+

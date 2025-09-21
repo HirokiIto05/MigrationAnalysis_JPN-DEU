@@ -37,11 +37,11 @@ select_cols_de <- function(df_de) {
 #' @title Create analysis data
 #' @description Add a regressor and outcome with lagged data.
 #' At that time, winsorize the top and bottom 1%
-create_scatter_df <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
+generate_df_main <- function(df_input, var_y, cutoff = 1, lag_i = 1) {
 
   var_y <- enquo(var_y)
   
-  plot_based_df <- input_df |> 
+  plot_based_df <- df_input |> 
     arrange(county_id, year) |> 
     mutate(
       ln_total = log(!!var_y),
@@ -54,10 +54,50 @@ create_scatter_df <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
     dplyr::slice_max(prop = cutoff, order_by = total, by = "year")
 }
 
+
+#' @title Create analysis data
+#' @description Add a regressor and outcome with lagged data.
+#' At that time, winsorize the top and bottom 1%
+generate_df_main_lag_n <- function(df_input, var_y) {
+
+  var_y <- enquo(var_y)
+  
+  plot_based_df <- df_input |> 
+    arrange(county_id, year) |> 
+    mutate(
+      ln_total = log(!!var_y),
+      lag_ln_total2 = dplyr::lag(log(!!var_y), n = 2),
+      lag_ln_total3 = dplyr::lag(log(!!var_y), n = 3),
+      # ln_change_rate_total = log(!!var_y) - dplyr::lag(log(!!var_y), n = lag_i),
+      ln_change_rate_total2 = ln_total - lag_ln_total2,
+      ln_change_rate_total3 = ln_total - lag_ln_total3,
+      .by = county_id
+    ) |>  
+    mutate(
+      ln_change_rate_total2 = Winsorize(ln_change_rate_total2, val = quantile(ln_change_rate_total2, probs = c(0.01, 0.99), na.rm = TRUE)), 
+      ln_change_rate_total3 = Winsorize(ln_change_rate_total3, val = quantile(ln_change_rate_total3, probs = c(0.01, 0.99), na.rm = TRUE)), 
+      .by = year)  |> 
+    mutate(
+      ln_change_rate_total = case_when(
+        year == 2015 ~ ln_change_rate_total2,
+        year == 2019 ~ ln_change_rate_total3,
+        year == 2023 ~ ln_change_rate_total3,
+        .default = NA
+      ),
+      lag_ln_total = case_when(
+        year == 2015 ~ lag_ln_total2,
+        year == 2019 ~ lag_ln_total3,
+        year == 2023 ~ lag_ln_total3,
+        .default = NA
+      )
+    )
+}
+
+
 #' @title Create a basic scatter plot
 #' 
 #' @param lag_i The number of lags
-create_scatter <-  function(input_df, var_x){
+create_scatter <-  function(input_df, var_x, title_i = NULL){
 
   var_x <- enquo(var_x)
 
@@ -66,6 +106,11 @@ create_scatter <-  function(input_df, var_x){
     geom_point(alpha = 0.5, colour = "#333333",
                fill = "#333333") +
     theme_bw(base_family = "HiraKakuPro-W3") +
+    labs(
+      title = title_i,
+      x = "Lagged log population",
+      y = "Change rate of log population"
+    ) +
     theme(
       panel.border       = element_blank(),
       axis.line.x.bottom = element_line(color = 'black'),
@@ -73,14 +118,14 @@ create_scatter <-  function(input_df, var_x){
       axis.line.y.right  = element_line(color = 'black'),
       axis.text.y.right  = element_blank(),
       plot.title = element_text(size = 15),
-      axis.text.x = element_text(size = 20),
-      axis.text.y = element_text(size = 20),
-      axis.title.x = element_text(size = 22),
-      axis.title.y = element_text(size = 22),
+      axis.text.x = element_text(size = 15),
+      axis.text.y = element_text(size = 15),
+      axis.title.x = element_text(size = 18),
+      axis.title.y = element_text(size = 18),
       panel.grid.major.y = element_line(color = "lightgray"),
       strip.background = element_blank(),
-      strip.text = element_text(size = 22),
-      strip.text.x = element_text(size = 20)
+      strip.text = element_text(size = 20),
+      strip.text.x = element_text(size = 18)
       ) +
     geom_hline(yintercept = 0,
                linewidth = 0.6,
@@ -92,7 +137,8 @@ create_scatter <-  function(input_df, var_x){
                 color = "#3C8DAD",
                 linewidth = 1.3) +
     facet_wrap(~ year,
-               scales = "free") 
+               scales = "fixed",
+               ncol = 3) 
     # scale_x_continuous(breaks = c(5, 10)) +
     # scale_y_continuous(
     #   breaks = c(-2, -1, 0, 1, 2),
@@ -106,7 +152,7 @@ create_scatter <-  function(input_df, var_x){
 #' @title Create a basic scatter plot
 #' 
 #' @param lag_i The number of lags
-create_scatter_int <-  function(input_df, var_x, var_y){
+create_scatter_int <-  function(input_df, var_x, var_y, title_i){
 
   var_x <- enquo(var_x)
   var_y <- enquo(var_y)
@@ -116,6 +162,7 @@ create_scatter_int <-  function(input_df, var_x, var_y){
     geom_point(alpha = 0.5, colour = "#333333",
                fill = "#333333") +
     theme_bw(base_family = "HiraKakuPro-W3") +
+    labs(caption = title_i) + 
     theme(
       panel.border       = element_blank(),
       axis.line.x.bottom = element_line(color = 'black'),
@@ -182,9 +229,9 @@ create_lm <- function(df_input, var_y, var_x) {
     "2021" = lm_robust(formula = as.formula(formula_i), 
                        data = dplyr::filter(df, year == 2021)),
     "2022" = lm_robust(formula = as.formula(formula_i), 
-                       data = dplyr::filter(df, year == 2022))
-    # "2023" = lm_robust(formula = as.formula(formula_i), 
-    #                     data = dplyr::filter(df, year == 2023))
+                       data = dplyr::filter(df, year == 2022)),
+    "2023" = lm_robust(formula = as.formula(formula_i), 
+                        data = dplyr::filter(df, year == 2023))
     )
   return(model_output)
 }
@@ -192,7 +239,7 @@ create_lm <- function(df_input, var_y, var_x) {
 
 #' @title Create a model summary
 #' @param model_input List : list of the result of lm_robust()
-create_model_summary <- function (model_input, title_n) {
+create_model_summary <- function (model_input, title_n, type_output) {
   
   gm <- tibble(
     raw = c("nobs", "r.squared", "adj.r.squared"),
@@ -207,13 +254,44 @@ create_model_summary <- function (model_input, title_n) {
                                         gof_map = gm,
                                         gof_omit = 'AIC|BIC|RMSE',
                                         coef_omit = 1:1,
-                                        # output = "data.frame")
-                                        output = "html")
-  
-  results_model <- model_based 
-  
+                                        output = type_output)
+
+  results_model <- model_based
+
   return(results_model)
   
+}
+
+
+
+create_kable_lm <- function(df, is_save = FALSE, file_name = NULL) {
+  output_kable <- df |>
+    mutate(
+      term = case_when(
+        "statistic" == "estimate" ~ "beta",
+        "statistic" == "std.error" ~ "beta_se",
+        TRUE ~ term
+      )
+    ) |> 
+    select(-part, -statistic) |>
+    kable(
+      # format = "latex",
+      escape = FALSE,
+      # col.names = c("Term", "2014", "2015", "2016", "2017", "2018", "2019")
+    ) |>
+    kable_styling(
+      full_width = FALSE,
+      position = "left"
+    )
+
+  if(is_save == TRUE) {
+    output_kable |>
+      save_kable(
+        file = here("04_output", "source", "tables", paste0(file_name, ".png")),
+        self_contained = TRUE,
+        zoom = 5
+      )
+  }
 }
 
 
@@ -225,9 +303,6 @@ create_model_summary <- function (model_input, title_n) {
 change_country_name <- function(df) {
 
   df_output <- df |>
-  dplyr::filter(
-    between(year, 2013, 2019)
-    ) |>
   mutate(
     country_name = case_when(
       country_name == "Egypt" ~ "Egypt, Arab Rep.",
@@ -303,7 +378,7 @@ remove_unavailable_counties <- function(df) {
 #' @description sum male and female values
 merge_municipalities <- function(df) {
 
-        df <- df |> 
+        df |> 
           mutate(
             # across(-c(year, county_id, county_name, category), as.numeric), 
             county_id = case_when(
@@ -325,7 +400,220 @@ merge_municipalities <- function(df) {
               )
           )
 
-    return(df)
 }
 
 
+create_nw_estimate <- function(df_nw, df_bootstrap, title_i) {
+
+  plot_nw_jp <- ggplot() +
+    geom_line(data = df_nw, aes(x = x, y = y), color = "black", linewidth = 0.8) +              # ksmooth回帰線
+    geom_line(data = df_bootstrap, aes(x = x, y = y_05), color = "black", linetype = "longdash", linewidth = 0.5) +  
+    geom_line(data = df_bootstrap, aes(x = x, y = y_95), color = "black", linetype = "longdash", linewidth = 0.5) +  
+    theme_bw(base_family = "HiraKakuPro-W3") +
+    labs(
+      title = title_i,
+      x = "Lagged log population",
+      y = "Change rate of log population(standardized)" # Change the y-axis label as needed
+    ) +
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title = element_text(size = 15),
+      axis.text.x = element_text(size = 18),
+      axis.text.y = element_text(size = 18),
+      axis.title.x = element_text(size = 22),
+      axis.title.y = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background = element_blank(),
+      strip.text = element_text(size = 20),
+      strip.text.x = element_text(size = 18)
+      ) +
+    geom_hline(yintercept = 0,
+               linewidth = 0.6,
+               colour = "black",
+               linetype = "solid") +
+    facet_wrap(~ year,
+               scales = "fixed",
+               ncol = 3) 
+
+
+}
+
+
+standize_var_y <- function(df_input, var_y) {
+
+  var_y <- enquo(var_y)
+
+  df_summary_mean_sd <- df_input |>
+    dplyr::filter(!is.infinite(!!var_y)) |>
+    summarise(
+      mean = mean(!!var_y, na.rm = TRUE),
+      sd = sd(!!var_y, na.rm = TRUE),
+      .by = year
+    )
+  
+  df_output <- df_input |>
+    left_join(df_summary_mean_sd, by = "year") |>
+    mutate(
+      !!var_y := (!!var_y - mean) / sd
+    )
+  
+}
+
+
+add_int_ext_change <- function(df, lag_i = 1) {
+
+  df_output <- df |>
+    arrange(county_id, year) |>
+    mutate(
+      lag_total = dplyr::lag(total, n = 1),
+      .by = county_id
+    ) |>
+    mutate(
+      internal_total = dplyr::lag(total, n = 1) + add_internal - exit_internal,
+      external_total = dplyr::lag(total, n = 1) + add_external - exit_external,
+      .by = county_id
+    ) |>
+    mutate(
+      lag_ln_total = dplyr::lag(log(total), n = 1),
+      ln_change_rate_internal = log(internal_total) - log(lag_total),
+      ln_change_rate_external = log(external_total) - log(lag_total),
+    )
+
+  if(lag_i != 1) {
+
+    df_add_exit <- df |>
+      dplyr::filter(year <= 2018) |>
+      summarise(
+        add = sum(add, na.rm = TRUE),
+        add_internal = sum(add_internal, na.rm = TRUE),
+        add_external = sum(add_external, na.rm = TRUE),
+        exit = sum(exit, na.rm = TRUE),
+        exit_internal = sum(exit_internal, na.rm = TRUE),
+        exit_external = sum(exit_external, na.rm = TRUE),
+        .by = c(county_id, county_name)
+      )
+
+    df_output <- df |>
+      dplyr::filter(year == 2013) |> 
+      select(county_id, county_name, total) |>
+      left_join(df_add_exit, by = c("county_id", "county_name")) |>
+      mutate(
+        ln_total = log(total),
+        internal_total = total + add_internal - exit_internal,
+        external_total = total + add_external - exit_external,
+        .by = county_id
+      ) |> 
+      mutate(
+        # lag_ln_total = dplyr::lag(log(total), n = 1),
+        ln_change_rate_internal = log(internal_total) - log(total),
+        ln_change_rate_external = log(external_total) - log(total),
+      ) 
+  }
+
+  return(df_output)
+}
+
+
+scatter_plot_lag6 <- function(df_input, var_x, var_y, title_i) {
+
+  var_x <- enquo(var_x)
+  var_y <- enquo(var_y)
+
+  output_plot <- ggplot(df_input,
+                       aes(x = !!var_x, y = !!var_y)) +
+    geom_point(alpha = 0.5, colour = "#333333",
+               fill = "#333333") +
+    theme_bw(base_family = "HiraKakuPro-W3") +
+    labs(caption = title_i) + 
+    theme(
+      panel.border       = element_blank(),
+      axis.line.x.bottom = element_line(color = 'black'),
+      axis.line.y.left   = element_line(color = 'black'),
+      axis.line.y.right  = element_line(color = 'black'),
+      axis.text.y.right  = element_blank(),
+      plot.title         = element_text(size = 15),
+      axis.text.x        = element_text(size = 18),
+      axis.text.y        = element_text(size = 18),
+      axis.title.x       = element_text(size = 22),
+      axis.title.y       = element_text(size = 22),
+      panel.grid.major.y = element_line(color = "lightgray"),
+      strip.background   = element_blank(),
+      strip.text         = element_text(size = 20),
+      strip.text.x       = element_text(size = 18)
+      ) +
+    geom_hline(yintercept = 0,
+               linewidth = 0.6,
+               colour = "black",
+               linetype = "solid") +
+    geom_smooth(method = "lm",
+                formula = y ~ x,
+                se = FALSE,
+                color = "#3C8DAD",
+                linewidth = 1.3) +
+    facet_wrap(~ migration_type,
+               scales = "fixed",
+               ncol = 2)
+    # scale_x_continuous(breaks = c(5, 10)) +
+    # scale_y_continuous(
+    #   breaks = c(-2, -1, 0, 1, 2),
+    #   limits = c(-2, 2)
+    # )
+  
+  return(output_plot)
+}
+
+
+generate_urban_rural_pref_japan <- function() {
+  list_pref_urban <- c("東京都", "神奈川県", "大阪府", "愛知県", "埼玉県", "千葉県", "兵庫県")
+ 
+  list_pref_rural <- c(
+    "秋田県", "香川県", "和歌山県", "佐賀県", "山梨県", "福井県", "徳島県",
+    "高知県", "島根県", "鳥取県")
+
+  df <- readxl::read_xlsx(here("01_data", "intermediate", "japan", "jp_city_size.xlsx")) |>
+    distinct(prefecture_name) |>
+    mutate(
+      case_when(
+        prefecture_name %in% list_pref_urban ~ "urban",
+        prefecture_name %in% list_pref_rural ~ "rural",
+        .default = "intermediate"
+      )
+    )
+  
+  return(df)
+}
+
+
+generate_urban_rural_de <- function() {
+
+  df_de_total <- read.csv(here("01_data", "intermediate", "german", "total_master.csv"))
+
+  df_de_area <- read_xlsx(here("01_data", "raw", "german", "area", "area.xlsx")) |>
+    select(
+      county_id = 1,
+      area = 3
+    ) |>
+    mutate(across(c(area, county_id), as.numeric)) |>
+    dplyr::filter(!is.na(area))
+
+  df_de_class <- df_de_total |> 
+    rename(total = population) |>
+    left_join(df_de_area, by = "county_id") |> 
+    mutate(density = total / area) |> 
+    dplyr::filter(year == 2019) |>
+    mutate(
+      class = case_when(
+        total >= 500000 ~ "big",
+        (density >= 150) & (total >=100000)  ~ "urban",
+        # density >= 100 ~ "mid",
+        # density < 100 ~ "rural",
+        TRUE ~ "rural"
+      )
+    ) 
+  return(df_de_class)
+
+}

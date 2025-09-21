@@ -1,0 +1,211 @@
+---
+title: "250810_country report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+---
+
+
+```{r}
+source(here::here("05_config", "packages.R"))
+source(here("03_analysis", "analysis_funs.r"))
+```
+
+```{r}
+df_edu_jp_raw <- read.csv(here("01_data", "intermediate", "japan", "education.csv"), fileEncoding = "cp932") |>
+  as_tibble()
+
+df_edu_de <- readxl::read_xlsx(
+  here("01_data", "intermediate", "german", "educ_master.xlsx")
+)
+
+# Degree of Urbanization
+df_class_urban_jp <- generate_urban_rural_pref_japan()
+
+# NUTS correspondence table
+df_cores <- readxl::read_xlsx(
+  here("01_data", "intermediate", "german", "nuts_correspondence.xlsx")
+)
+
+classify_nut2_urban <- function() {
+
+  df_class_urban_de <- generate_urban_rural_de() 
+
+  df_class_urban_de |>
+    left_join(df_cores, by = "county_name")
+
+}
+
+df_jp_country <- df_jp_country_raw |>
+  select(year, county_id = city_id, iso_code, population = value) |>
+  left_join(df_class, by = "iso_code") |>
+  dplyr::filter(!is.na(country_name)) 
+```
+
+
+```{r}
+clean_jp_edu <- function(df) {
+
+  df_edu_jp |> 
+    mutate(
+      sum_value = sum(value, na.rm = TRUE),
+      .by = c(year, prefecture_id)) |> 
+    mutate(
+      percent = round((value / sum_value), digits = 2)
+    ) |> 
+    select(
+      prefecture_name,
+      year,
+      lv_edu,
+      percent
+    )
+
+}
+```
+
+
+```{r}
+df_edu_jp <- clean_jp_edu(df_edu_jp_raw)
+```
+
+```{r}
+generate_sum_class <- function(df) {
+
+  df |>
+    summarise(
+      population = sum(population, na.rm = TRUE), 
+      .by = c(cls_income, year)
+    ) |>
+    mutate(
+      percent = population / sum(population, na.rm = TRUE),
+      .by = year
+    )
+}
+
+
+generate_plot_base <- function(df_jp_country, df_de_country) {
+
+
+  df_jp_summary <- generate_sum_class(df_jp_country) |>
+    mutate(
+      country = "Japan",
+      year = as.numeric(year))
+  df_de_summary <- generate_sum_class(df_de_country) |>
+    mutate(
+      country = "Germany",
+      year = as.numeric(year))
+
+  df_plot <- df_jp_summary |>
+    bind_rows(df_de_summary)
+}
+
+plot_class_year <- function(df_jp_country, df_de_country, title_i = NULL, var_y) {
+
+  var_y = enquo(var_y)
+
+  df_plot <- generate_plot_base(df_jp_country, df_de_country)
+
+  ggplot(data = df_plot, mapping = aes(x = year, y = !!var_y, group = cls_income, color = cls_income)) +
+    geom_point() + 
+    geom_line() +
+    theme_bw() +
+    facet_wrap(~country) +
+    theme(
+      legend.position = "bottom",
+      strip.background = element_blank()
+    ) 
+
+}
+```
+
+
+```{r}
+plot_class_year(df_jp_country, df_de_country, title_i = NULL, var_y = population)
+```
+
+
+```{r}
+plot_class_year(df_jp_country, df_de_country, title_i = NULL, var_y = percent)
+```
+
+# Urban
+
+```{r}
+de_city_size <- openxlsx::read.xlsx(here("01_data", "intermediate", "germany", "de_city_size.xlsx")) |>
+  select(county_id, class)
+
+jp_city_size <- openxlsx::read.xlsx(here("01_data", "intermediate", "japan", "jp_city_size.xlsx")) |>
+  select(county_id, class)
+```
+
+
+
+```{r}
+df_size_income_jp <- df_jp_country |> 
+  left_join(jp_city_size, by = "county_id") |>
+  summarise(
+    population = sum(population, na.rm = TRUE),
+    .by = c(cls_income, class, year)
+  )
+```
+## Japan
+
+```{r}
+df_size_income_jp |>
+  dplyr::mutate(year = as.numeric(year)) |>
+  ggplot(aes(x = year, y = population, group = cls_income, color = cls_income)) +
+  geom_point() + 
+  geom_line() +
+  facet_wrap(~class) + theme_bw() +
+  labs(
+    title = "Japan"
+  )+
+  theme(
+    legend.position = "bottom",
+    strip.background = element_blank()
+  ) +
+  scale_x_continuous(
+    breaks = c(2010, 2005, 2020)
+  )
+```
+
+## Germany
+
+```{r}
+df_size_income_de <- df_de_country |> 
+  left_join(de_city_size, by = "county_id") |>
+  summarise(
+    population = sum(population, na.rm = TRUE),
+    .by = c(cls_income, class, year)
+  ) 
+
+```
+```{r}
+df_size_income_de |>
+  dplyr::mutate(year = as.numeric(year)) |> 
+  dplyr::filter(!is.na(cls_income)) |>
+  ggplot(aes(x = year, y = population, group = cls_income, color = cls_income)) +
+  geom_point() + 
+  geom_line() +
+  facet_wrap(~class) + theme_bw() +
+  labs(
+    title = "Germany"
+  ) +
+  theme(
+    legend.position = "bottom",
+    strip.background = element_blank()
+  ) +
+  scale_x_continuous(
+    breaks = c(2010, 2005, 2020)
+  )
+```
+

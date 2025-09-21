@@ -10,7 +10,22 @@ df_raw_foreign <- readxl::read_xlsx(
 
 df <- select_columns(df_raw) 
 df <- merge_counties(df)
+a_total <- df |> 
+  summarise(
+    population = sum(population, na.rm = TRUE),
+    .by = c(year)
+  )
+a_foreign <-df_de |>
+  summarise(
+    total = sum(total, na.rm = TRUE),
+    .by = c(year)
+  )
 
+a_total |>
+  left_join(a_foreign, by = "year") |>
+  mutate(
+    native = population - total
+  ) |> View()
 # Not available on Foreigner's data
 # Description below
 df <- df |>

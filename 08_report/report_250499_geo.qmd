@@ -76,11 +76,11 @@ df_jp_native <- select_cols_jp(df_jp_native_raw)
 
 ```{r}
 df_analysis <- df_de |>
-  create_scatter_df(total) |>  
+  generate_df_main(total) |>  
   dplyr::filter(year == 2019)
 
 df_analysis_a <- df_de |>
-  create_scatter_df(total) |> 
+  generate_df_main(total) |> 
   dplyr::filter(year == 2019)
 
 mean_de <- mean(df_analysis$ln_change_rate_total, na.rm = TRUE)

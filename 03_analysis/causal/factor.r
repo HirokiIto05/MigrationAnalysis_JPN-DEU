@@ -16,11 +16,11 @@ main <- function() {
     dplyr::filter(between(year, 2013, 2019)) 
 
   df_jp <- select_cols_jp(df_jp_raw) |>
-    create_scatter_df(total)
+    generate_df_main(total)
   df_de <- select_cols_de(df_de_raw) |>
-    create_scatter_df(total)
+    generate_df_main(total)
   df_jp_native <- select_cols_jp(df_jp_native_raw) |>
-    create_scatter_df(total)
+    generate_df_main(total)
 
   ### Age data
   # df_de_age <- read.csv(here("01_data", "intermediate", "german", "age_muni_master.csv")) |> View()

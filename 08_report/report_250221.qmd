@@ -368,7 +368,7 @@ cdf_jp_native + cdf_de_native + plot_layout(ncol = 1)
 # Scatter plot
 
 ```{r}
-create_scatter_df <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
+generate_df_main <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
 
   var_y <- enquo(var_y)
   
@@ -498,13 +498,13 @@ create_scatter <-  function(input_df, var_x){
 #| fig-height: 14
 #| fig-width: 12
 df_jp |>
-  create_scatter_df(total) |> 
+  generate_df_main(total) |> 
   create_scatter(lag_ln_total)
 ```
 
 ```{r}
 df_jp |>
-  create_scatter_df(total) |> 
+  generate_df_main(total) |> 
   dplyr::filter(
     !is.infinite(ln_change_rate_total),
     !is.infinite(lag_ln_total)) |>
@@ -525,13 +525,13 @@ quantile(df_jp$total, probs = seq(0, 1, 0.1))
 #| fig-height: 14
 #| fig-width: 12
 df_jp |>
-  create_scatter_df(total, 0.90) |>
+  generate_df_main(total, 0.90) |>
   create_scatter(lag_ln_total)
 ```
 
 ```{r}
 df_jp |> 
-  create_scatter_df(total, cutoff = 0.9) |>  
+  generate_df_main(total, cutoff = 0.9) |>  
   create_lm("ln_change_rate_total", "lag_ln_total") |>
   create_model_summary("top90")
 ```
@@ -544,7 +544,7 @@ df_jp |>
 #| fig-height: 14
 #| fig-width: 12
 df_de |> 
-  create_scatter_df(total) |>  
+  generate_df_main(total) |>  
   create_scatter(lag_ln_total)
 ```
 
@@ -552,7 +552,7 @@ df_de |>
 
 ```{r}
 df_de |> 
-  create_scatter_df(total) |>  
+  generate_df_main(total) |>  
   create_lm("ln_change_rate_total", "lag_ln_total") |>
   create_model_summary("Non-cutoff")
 ```
@@ -564,7 +564,7 @@ df_de |>
 - Full sample
 ```{r}
 df_jp |>
-  create_scatter_df(total, lag_i = 2) |>
+  generate_df_main(total, lag_i = 2) |>
   dplyr::filter(
     !is.infinite(ln_change_rate_total),
     !is.infinite(lag_ln_total),
@@ -576,7 +576,7 @@ df_jp |>
 
 ```{r}
 df_jp |>
-  create_scatter_df(total, 2) |> 
+  generate_df_main(total, 2) |> 
   dplyr::filter(
     !is.infinite(ln_change_rate_total),
     !is.infinite(lag_ln_total),
@@ -589,7 +589,7 @@ df_jp |>
 - top90% sample
 ```{r}
 df_jp |>
-  create_scatter_df(total, cutoff = 0.9, lag_i = 2) |> 
+  generate_df_main(total, cutoff = 0.9, lag_i = 2) |> 
   dplyr::filter(
     !is.infinite(ln_change_rate_total),
     !is.infinite(lag_ln_total),
@@ -602,7 +602,7 @@ df_jp |>
 #### Germany
 ```{r}
 df_de |>
-  create_scatter_df(total, lag_i = 2) |>
+  generate_df_main(total, lag_i = 2) |>
   dplyr::filter(
     !is.infinite(ln_change_rate_total),
     !is.infinite(lag_ln_total),
@@ -613,7 +613,7 @@ df_de |>
 
 ```{r}
 df_de |>
-  create_scatter_df(total, lag_i = 2) |> 
+  generate_df_main(total, lag_i = 2) |> 
   dplyr::filter(
     !is.infinite(ln_change_rate_total),
     !is.infinite(lag_ln_total),
@@ -650,10 +650,10 @@ df_jp_int <- df_jp |>
 ```{r}
 #| eval: false
 # df_jp_int |> 
-#   # create_scatter_df(net_internal) |>
+#   # generate_df_main(net_internal) |>
 #   create_scatter_int(total, y_internal)  
 # df_jp_int |>
-#   # create_scatter_df(net_external) |>
+#   # generate_df_main(net_external) |>
 #   create_scatter_int(total_native, y_external)
 ```
 ### Population complement
@@ -720,10 +720,10 @@ df_de_int <- df_de |>
 ```{r}
 #| eval: false
 df_de_int |>
-  create_scatter_df(net_internal) |>
+  generate_df_main(net_internal) |>
   create_scatter_int(net_internal)  
 df_de_int |>
-  create_scatter_df(net_external) |>
+  generate_df_main(net_external) |>
   create_scatter_int(net_external)
 ```
 
@@ -822,19 +822,19 @@ create_model_summary <- function (model_input, title_n) {
 
 ```{r}
 #| eval: false
-estimate_total <- create_lm_robust(df_jp_int |> create_scatter_df(net_internal), "ln_change_rate_total", "lag_ln_total_native")
+estimate_total <- create_lm_robust(df_jp_int |> generate_df_main(net_internal), "ln_change_rate_total", "lag_ln_total_native")
 create_model_summary(estimate_total, "Total")
 
-estimate_total <- create_lm_robust(df_jp_int |> create_scatter_df(net_external), "ln_change_rate_total", "lag_ln_total_native")
+estimate_total <- create_lm_robust(df_jp_int |> generate_df_main(net_external), "ln_change_rate_total", "lag_ln_total_native")
 create_model_summary(estimate_total, "Total")
 ```
 
 ```{r}
 #| eval: false
-estimate_total <- create_lm_robust(df_de_int |> create_scatter_df(net_internal), "ln_change_rate_total", "lag_ln_total_native")
+estimate_total <- create_lm_robust(df_de_int |> generate_df_main(net_internal), "ln_change_rate_total", "lag_ln_total_native")
 create_model_summary(estimate_total, "Total")
 
-estimate_total <- create_lm_robust(df_de_int |> create_scatter_df(net_external), "ln_change_rate_total", "lag_ln_total_native")
+estimate_total <- create_lm_robust(df_de_int |> generate_df_main(net_external), "ln_change_rate_total", "lag_ln_total_native")
 create_model_summary(estimate_total, "Total")
 ```
 

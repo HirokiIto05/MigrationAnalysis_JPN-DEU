@@ -1,0 +1,177 @@
+---
+title: "250910 report R"
+format: 
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+  output: asis
+---
+
+
+```{r}
+library(here)
+library(sf)
+source(here::here("05_config", "packages.R"))
+source(here("03_analysis", "analysis_funs.r"))
+```
+
+```{r}
+jp_county_classification <- read.xlsx(here("01_data/intermediate/grid_pop/jp_county_classification.xlsx"))
+
+de_county_classification <- read.xlsx(here("01_data/intermediate/grid_pop/de_county_classification.xlsx"))
+
+
+jp_prefecture_classification <- read.xlsx(here("01_data/intermediate/grid_pop/jp_prefecture_classification.xlsx"))
+
+
+de_nuts2_classification <- read.xlsx(here("01_data/intermediate/grid_pop/de_nuts2_classification.xlsx"))
+
+geo_jp_after <- st_read(here("01_data/intermediate/grid_pop/japan_grid_classified.gpkg"))
+geo_de_after <- st_read(here("01_data/intermediate/grid_pop/germany_grid_classified.gpkg"))
+```
+
+```{r}
+cat("日本の市区町村分類:\n")
+jp_county_classification %>%
+  count(county_type) %>%
+  mutate(percentage = round(n/sum(n)*100, 1)) %>%
+  print()
+
+cat("\nドイツの市区町村分類:\n") 
+de_county_classification %>%  
+  count(county_type) %>%
+  mutate(percentage = round(n/sum(n)*100, 1)) %>%
+  print()
+```
+
+
+```{r}
+
+# 結果確認
+cat("日本の都道府県分類:\n")
+jp_prefecture_classification %>%
+  count(region_type) %>%
+  mutate(percentage = round(n/sum(n)*100, 1)) %>%
+  print()
+
+cat("\nドイツのNUTS2分類:\n") 
+de_nuts2_classification %>%
+  count(region_type) %>%
+  mutate(percentage = round(n/sum(n)*100, 1)) %>%
+  print()
+```
+
+```{r}
+# 分類表の作成
+
+create_classification_table <- function(grid_data, county_data, region_data, country_name) {
+  
+  # グリッドレベル集計
+  grid_summary <- grid_data %>%
+    st_drop_geometry() %>%
+    summarise(
+      level = "Grid",
+      cities = sum(category == "Centre"),
+      towns = sum(category == "Cluster"),
+      rural = sum(category == "Rural"),
+      total = n(),
+      .groups = "drop"
+    )
+  
+  # 市区町村レベル集計
+  county_summary <- county_data %>%
+    summarise(
+      level = "County/Municipality",
+      cities = sum(county_type == "Cities"),
+      towns = sum(county_type == "Towns & semi-dense areas"),
+      rural = sum(county_type == "Rural areas"),
+      total = n(),
+      .groups = "drop"
+    )
+  
+  # 都道府県/NUTS2レベル集計
+  region_summary <- region_data %>%
+    summarise(
+      level = ifelse(country_name == "Japan", "Prefecture", "NUTS2"),
+      cities = sum(region_type == "Cities"),
+      towns = sum(region_type == "Towns & semi-dense areas"),
+      rural = sum(region_type == "Rural areas"),
+      total = n(),
+      .groups = "drop"
+    )
+  
+  # 統合表
+  classification_table <- bind_rows(grid_summary, county_summary, region_summary) %>%
+    mutate(
+      country = country_name,
+      cities_pct = round(cities/total*100, 1),
+      towns_pct = round(towns/total*100, 1),
+      rural_pct = round(rural/total*100, 1)
+    ) %>%
+    select(country, level, cities, cities_pct, towns, towns_pct, rural, rural_pct, total)
+  
+  return(classification_table)
+}
+
+```
+
+```{r}
+# 日本とドイツの分類表作成
+jp_classification_table <- create_classification_table(
+  geo_jp_after, jp_county_classification, jp_prefecture_classification, "Japan"
+)
+
+de_classification_table <- create_classification_table(
+  geo_de_after, de_county_classification, de_nuts2_classification, "Germany"
+)
+
+# 統合分類表
+combined_classification_table <- bind_rows(jp_classification_table, de_classification_table)
+```
+
+```{r}
+library(gt)
+
+combined_classification_table %>%
+  gt() %>%
+  tab_header(
+    title = "日本とドイツの地域分類集計表"
+  ) %>%
+  fmt_number(
+    columns = c(cities_pct, towns_pct, rural_pct),
+    decimals = 1,
+    suffixing = TRUE
+  ) %>%
+  cols_label(
+    country = "国",
+    level = "集計レベル",
+    cities = "数",
+    cities_pct = "割合 (%)",
+    towns = "数",
+    towns_pct = "割合 (%)",
+    rural = "数",
+    rural_pct = "割合 (%)",
+    total = "合計"
+  ) %>%
+  tab_spanner(
+    label = "都市",
+    columns = c(cities, cities_pct)
+  ) %>%
+  tab_spanner(
+    label = "町",
+    columns = c(towns, towns_pct)
+  ) %>%
+  tab_spanner(
+    label = "農村",
+    columns = c(rural, rural_pct)
+  )
+```
+

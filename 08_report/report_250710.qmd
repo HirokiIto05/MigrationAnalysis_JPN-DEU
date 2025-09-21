@@ -1,0 +1,143 @@
+---
+title: "250499 report"
+format:
+  html:
+    toc: true
+    number_sections: true
+    toc_float: true
+    df_print: paged
+    embed-resources: true
+    self-contained: true
+
+execute:
+  echo: false
+  warning: false
+---
+
+```{r}
+source(here::here("05_config", "packages.R"))
+source(here("03_analysis", "analysis_funs.r"))
+```
+
+```{r}
+# Load raw data ----
+df_jp_raw <- read.csv(here("01_data", "intermediate", "population", "overseas_master.csv"), fileEncoding = "cp932")
+df_de_raw <- read.csv(here("01_data", "intermediate", "german", "foreign_master.csv"))
+
+df_jp_native_raw <- read.csv(here("01_data", "intermediate", "population", "japanese_master.csv"), fileEncoding = "cp932")
+df_de_native <- read.csv(here("01_data", "intermediate", "german", "native_master.csv")) |>
+  select(-total_foreign) |>
+  rename(total = population)
+
+
+# Data ----
+df_jp <- select_cols_jp(df_jp_raw)
+df_de <- select_cols_de(df_de_raw)
+df_jp_native <- select_cols_jp(df_jp_native_raw)
+```
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+df_jp |>
+  # generate_df_main(total, lag_i = 2) |> 
+  generate_df_main_lag_n(total) |> 
+  dplyr::filter(year %in% c(2015, 2019, 2023)) |>   
+  create_scatter(lag_ln_total, title_i = "Japanese foreign population")
+```
+
+```{r results='asis'}
+df_jp |>
+  # generate_df_main(total) |> 
+  # dplyr::filter(between(year, 2014, 2019)) |>  
+  generate_df_main_lag_n(total) |> 
+  dplyr::filter(year %in% c(2015, 2019, 2023)) |>   
+  dplyr::filter(!is.infinite(lag_ln_total)) |> 
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  create_model_summary("Japanese Foreigners", "data.frame") |>
+  # Select columns to remove
+  dplyr::select(`2015`,`2019`,`2023`) |>
+  gt() 
+```
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+df_de |>
+  # generate_df_main(total) |> 
+  # dplyr::filter(between(year, 2014, 2023), year != 2016) |>
+  generate_df_main_lag_n(total) |> 
+  dplyr::filter(year %in% c(2015, 2019, 2023)) |>   
+  create_scatter(lag_ln_total, title_i = "German foreign population")
+```
+
+```{r results='asis'}
+df_de |>
+  # generate_df_main(total) |> 
+  # dplyr::filter(between(year, 2014, 2019)) |>  
+  generate_df_main_lag_n(total) |> 
+  dplyr::filter(year %in% c(2015, 2019, 2023)) |> 
+  dplyr::filter(!is.infinite(lag_ln_total)) |> 
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  create_model_summary("German Foreigners", "data.frame") |>
+  dplyr::select(`2015`,`2019`,`2023`) |>
+  gt()
+```
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+## Native population ----
+df_jp_native |>
+  # generate_df_main(total) |> 
+  # dplyr::filter(between(year, 2014, 2023)) |>
+  generate_df_main_lag_n(total) |> 
+  dplyr::filter(year %in% c(2015, 2019, 2023)) |>   
+  create_scatter(lag_ln_total, title_i = "Japanese native population")
+```
+
+```{r results='asis'}
+df_jp_native |>
+  # generate_df_main(total) |> 
+  # dplyr::filter(between(year, 2014, 2019)) |>  
+  generate_df_main_lag_n(total) |> 
+  dplyr::filter(year %in% c(2015, 2019, 2023)) |>   
+  dplyr::filter(!is.infinite(lag_ln_total)) |> 
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  create_model_summary("Japanese Natives", "data.frame") |> 
+  dplyr::select(`2015`,`2019`,`2023`) |>
+  gt()
+```
+
+
+```{r}
+#| fig-width: 8
+#| fig-height: 4
+df_de_native |>
+  # generate_df_main(total) |> 
+  # dplyr::filter(between(year, 2014, 2023), year != 2016) |>
+  generate_df_main_lag_n(total) |> 
+  dplyr::filter(year %in% c(2015, 2019, 2023)) |>   
+  create_scatter(lag_ln_total, title_i = "German native population")
+```
+
+```{r results='asis'}
+df_de_native |>
+  # generate_df_main(total) |> 
+  # dplyr::filter(between(year, 2014, 2019)) |>
+  generate_df_main_lag_n(total) |> 
+  dplyr::filter(year %in% c(2015, 2019, 2023)) |>     
+  dplyr::filter(!is.infinite(lag_ln_total)) |> 
+  create_lm("ln_change_rate_total", "lag_ln_total") |>
+  create_model_summary("German Natives", "data.frame") |>
+  dplyr::select(`2015`,`2019`,`2023`) |>
+  gt()
+```
+
+# country comparison ----
+
+```{r}
+
+```

@@ -1,16 +1,41 @@
 main <- function() {
 
-  df_raw <- read.csv(here("01_data", "raw", "german", "foreign", "country.csv"))
+  source(here("03_analysis", "analysis_funs.r"))
 
-  df <- adjust_cols(df_raw) |>
-    merge_counties() |>
+  df_country_raw <- purrr::map_dfr(
+    c(2010, 2015, 2020),
+    read_raw_data
+  )
+
+  df_country <- df_country_raw |>
+    merge_municipalities() |>
     remove_unavailable_counties() |>
-    summarise_total()
+    summarise_total() |>
+    change_country_name()
+
+  df_country_class <- readxl::read_xlsx(
+    here("01_data", "intermediate", "german", "country_classification_master.xlsx")
+  )
+
+  df_country_master <- df_country |>
+    left_join(df_country_class, by = "country_name") |>
+    dplyr::filter(!is.na(cls_income))
 
   openxlsx::write.xlsx(
-    df, 
-    here("01_data", "intermediate", "german", "country_master.xlsx")
+    df_country_master, 
+    here("01_data", "intermediate", "german", "country_class_master.xlsx")
   )
+}
+
+
+read_raw_data <- function(year_i) {
+
+  df_raw <- read_csv(here("01_data", "raw", "german", "foreign", paste0("country_", year_i, ".csv")))
+
+  df_output <- df_raw |>
+    adjust_cols()
+
+  return(df_output)
 }
 
 
@@ -35,57 +60,14 @@ adjust_cols <- function(df_raw) {
     select(-date) |>
     relocate(year, .before = 1) |>
     dplyr::filter(!is.na(population)) |>
-    dplyr::filter(country_name != "Total")
-}
-
-
-merge_counties <- function(df) {
-
-  df_output <- df |>
+    dplyr::filter(country_name != "Total") |>
     mutate(
-      county_id = case_when(
-        # Mecklenburg-Vorpommern
-        # Rostock and Schwerin don't change
-        county_id %in% c(13055,13056,13052,13002) ~ 13071,
-        county_id %in% c(13053,13051) ~ 13072,
-        county_id %in% c(13057,13005,13061) ~ 13073,
-        county_id %in% c(13057,13005,13061) ~ 13073,
-        county_id %in% c(13058,13006) ~ 13074,
-        county_id %in% c(13001,13059,13062) ~ 13075,
-        county_id %in% c(13054,13060) ~ 13076,
-        # Gettingen
-        county_id %in% c(3152, 3156) ~ 3159,
-        # Eisenach
-        county_id %in% c(16056, 16063) ~ 16063,
-        .default = county_id
+      if_else(
+        country_name %in% c("Unknown / Not specified", "Stateless"), 
+        "unknown",
+        country_name
         )
     )
-}
-
-
-remove_unavailable_counties <- function(df) {
-
-  # Not available on Foreigner's data
-  # Description below
-  df <- df |>
-  dplyr::filter(
-    !county_id %in% c(
-      # Saarland
-      10041, # Regionalverband Saarbrücken, Landkreis
-      10042, # Merzig-Wadern, Landkreis
-      10043, # Neunkirchen, Landkreis
-      10044, # Saarlouis, Landkreis
-      10045, # Saarpfalz-Kreis
-      10046  # Sankt Wendel, Landkreis
-    ),
-    !county_id %in% c(
-      12052, # Cottbus, kreisfreie Stadt
-      12071  # Spree-Neiße, Landkreis
-    ),
-    !county_id %in% c(
-      06633 # Kassel, Landkreis
-    )
-  )
 }
 
 
@@ -97,4 +79,25 @@ summarise_total <- function(df) {
       .by = c("year", "county_id", "country_name")
     )
 
+}
+
+
+subtract_seeking_protection <- function(df) {
+
+  df_de_asylum <- readxl::read_xlsx(here("01_data", "intermediate", "german", "protect_country.xlsx")) |>
+    select(
+      year, county_id, country_name, total_without_protection = total
+    )
+
+  df_output <- df |>
+    left_join(df_de_asylum, by = c("year", "county_id", "country_name")) |>
+    as_tibble()
+
+  df_output |> select(total_without_protection)
+    mutate(
+      total_without_protection = population - if_else(is.na(), 0, total)
+    )
+
+    
+  
 }

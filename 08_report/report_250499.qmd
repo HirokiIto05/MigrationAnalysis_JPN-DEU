@@ -76,11 +76,11 @@ df_jp_native <- select_cols_jp(df_jp_native_raw)
 
 ```{r}
 df_analysis <- df_de |>
-  create_scatter_df(total) |>  
+  generate_df_main(total) |>  
   dplyr::filter(year == 2019)
 
 df_analysis_a <- df_de |>
-  create_scatter_df(total) |> 
+  generate_df_main(total) |> 
   dplyr::filter(year == 2019)
 
 mean_de <- mean(df_analysis$ln_change_rate_total, na.rm = TRUE)
@@ -123,6 +123,10 @@ df_de_class <- df_de_total |>
       TRUE ~ "rural"
     )
   ) 
+
+
+# df_de_class |> 
+  # write.xlsx(here("01_data", "intermediate", "german", "de_city_size.xlsx"))
 ```
 
 ```{r}
@@ -219,6 +223,10 @@ df_jp_class <- df_jp_total |>
       total >= 50000 ~ "urban",
       TRUE ~ "rural"
     ))
+
+df_jp_class |>
+  write.xlsx(here("01_data", "intermediate", "japan", "jp_city_size.xlsx"))
+
 
 df_jp_class |>
   summarise(n = n(), .by = class) |>
@@ -325,7 +333,7 @@ create_ks_df <- function(year_i, df_input) {
   print(year_i)
 
   df_analysis <- df_input |>
-    create_scatter_df(total) |>
+    generate_df_main(total) |>
     dplyr::filter(year == year_i) |>
     dplyr::filter(!is.infinite(lag_ln_total))
 
@@ -418,13 +426,13 @@ df_de_country_without_syr <- df_de_country |>
 
 ```{r}
 df_de |> 
-  create_scatter_df(total)
+  generate_df_main(total)
 ```
 
 ```{r}
 df_de_country_without_syr |> 
   rename(total = value) |>
-  create_scatter_df(total) |>
+  generate_df_main(total) |>
 ggplot(aes(x = lag_ln_total, y = ln_change_rate_total)) +
   geom_point() +
   facet_wrap(~year)
@@ -434,7 +442,7 @@ ggplot(aes(x = lag_ln_total, y = ln_change_rate_total)) +
 
 lm_model_without_syr <- df_de_country_without_syr |>
   rename(total = value) |>
-  create_scatter_df(total) |>
+  generate_df_main(total) |>
   create_lm("ln_change_rate_total", "lag_ln_total") |>
   create_model_summary()
 
@@ -474,7 +482,7 @@ df_de_without_protection |>
     total = sum(total, na.rm = TRUE),
     .by = c(year, county_id)
   ) |>
-  create_scatter_df(total) |> 
+  generate_df_main(total) |> 
   ggplot(aes(x = lag_ln_total, y = ln_change_rate_total)) +
   geom_point() +
   facet_wrap(~year)
@@ -485,7 +493,7 @@ df_de_without_protection |>
 ```{r}
 model_base <- df_de |>
   dplyr::filter(between(year, 2013, 2019)) |>
-  create_scatter_df(total) |>
+  generate_df_main(total) |>
   create_lm("ln_change_rate_total", "lag_ln_total") |>
   modelsummary_mod(title_n = "Base Analysis") |>
   mutate(model = "Base")
@@ -495,7 +503,7 @@ model_base <- df_de |>
 model_without_syr <- df_de_country_without_syr |>
   rename(total = value) |>
     dplyr::filter(between(year, 2013, 2019)) |>
-  create_scatter_df(total) |> 
+  generate_df_main(total) |> 
   create_lm("ln_change_rate_total", "lag_ln_total") |>
   modelsummary_mod(title_n = "Germany without Syrian Arab Republic") |>
   mutate(model = "without_syr")
@@ -508,7 +516,7 @@ model_without_protection <- df_de_without_protection |>
     .by = c(year, county_id)
   ) |> 
     dplyr::filter(between(year, 2013, 2019)) |>
-  create_scatter_df(total) |>
+  generate_df_main(total) |>
   create_lm("ln_change_rate_total", "lag_ln_total") |>
   modelsummary_mod(title_n = "Germany without Persons seeking protection") |>
   mutate(model = "without_protection")
@@ -532,7 +540,7 @@ model_base |>
 ```{r}
 df_jp |> 
   left_join(df_jp_class |> select(county_id, class)) |>
-  create_scatter_df(total) |> 
+  generate_df_main(total) |> 
   summarise(
     mean_outcome = mean(ln_change_rate_total, na.rm = TRUE),
     .by = class
@@ -543,7 +551,7 @@ df_jp |>
 ```{r}
 df_de |>
   left_join(df_de_class |> select(county_id, class)) |>
-  create_scatter_df(total) |> 
+  generate_df_main(total) |> 
   summarise(
     mean_outcome = mean(ln_change_rate_total, na.rm = TRUE),
     .by = class

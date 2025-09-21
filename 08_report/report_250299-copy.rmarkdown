@@ -155,7 +155,7 @@ create_scatter <-  function(input_df, var_x, cutoff = 1){
 ```
 
 ```{r}
-create_scatter_df <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
+generate_df_main <- function(input_df, var_y, cutoff = 1, lag_i = 1) {
 
   var_y <- enquo(var_y)
   
@@ -241,7 +241,7 @@ create_density <-  function(input_df, var_x){
 
 ```{r}
 df_jp |> 
-  create_scatter_df(total) |>  
+  generate_df_main(total) |>  
   create_density()
 
 ```

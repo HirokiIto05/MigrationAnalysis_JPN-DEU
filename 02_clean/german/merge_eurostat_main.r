@@ -17,6 +17,8 @@ df_german_foreign <- read.csv(here("01_data", "intermediate", "german", "foreign
 df_main <- modify_german_reg_data(df_german_foreign, df_corr)
 df_main <- aggregate_population_by_nuts2(df_main)
 
+
+
 # Load Native population data
 df_german_native <- read.csv(here("01_data", "intermediate", "german", "native_master.csv")) |>
   rename(
@@ -39,16 +41,19 @@ df_res_pmt <- read.csv(here("01_data", "intermediate", "german", "selected_resid
   select(-X)
 
 df_res_pmt <- df_res_pmt |>  
-  left_join(df_corr, by = c("county_name" = "original_name"))
+  left_join(df_corr, by = c("county_name" = "original_name")) |> View()
+
 
 # Merge data frames
 df_merge <- df_main |>
-  left_join(df_educ, by = c("nuts_code2", "city_name", "year")) |>
+  left_join(df_educ, by = c("nuts_code2", "city_name", "year")) |>  
   mutate(
     across(ends_with(c("educat_1", "educat_2", "educat_3")), ~.*0.01)
-  ) 
+  )
 
 # Save merged data
 openxlsx::write.xlsx(
   df_merge,
   here("01_data", "intermediate", "german", "master_nuts2.xlsx"))
+
+
